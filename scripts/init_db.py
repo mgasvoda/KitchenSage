@@ -40,6 +40,9 @@ def create_database():
             cuisine TEXT,
             dietary_tags TEXT,
             instructions TEXT,
+            notes TEXT,
+            source TEXT,
+            image_url TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
@@ -51,7 +54,9 @@ def create_database():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT UNIQUE NOT NULL,
             category TEXT,
-            unit TEXT
+            common_unit TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
     
@@ -63,6 +68,9 @@ def create_database():
             ingredient_id INTEGER,
             quantity REAL,
             unit TEXT,
+            notes TEXT,
+            optional BOOLEAN DEFAULT FALSE,
+            substitutes TEXT,
             FOREIGN KEY (recipe_id) REFERENCES recipes (id),
             FOREIGN KEY (ingredient_id) REFERENCES ingredients (id)
         )

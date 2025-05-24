@@ -90,8 +90,11 @@ class DatabaseTool(BaseTool):
         """Create a new record."""
         try:
             if table == "recipes":
+                # Use specialized recipe creation method
                 recipe_data = RecipeCreate(**data)
-                record_id = repo.create(recipe_data.model_dump())
+                ingredients = data.get('ingredients', [])
+                recipe = repo.create_recipe(recipe_data, ingredients)
+                record_id = recipe.id
             elif table == "ingredients":
                 ingredient_data = IngredientCreate(**data)
                 record_id = repo.create(ingredient_data.model_dump())
@@ -122,10 +125,19 @@ class DatabaseTool(BaseTool):
         try:
             record = repo.get_by_id(record_id)
             if record:
+                # Convert model instance to dictionary for JSON serialization
+                if hasattr(record, 'model_dump'):
+                    record_dict = record.model_dump()
+                elif hasattr(record, 'dict'):
+                    record_dict = record.dict()
+                else:
+                    # Fallback for basic objects
+                    record_dict = record.__dict__
+                
                 return {
                     "status": "success",
                     "operation": "read",
-                    "record": record,
+                    "record": record_dict,
                     "message": "Record retrieved successfully"
                 }
             else:
