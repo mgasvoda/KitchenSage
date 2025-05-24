@@ -28,12 +28,13 @@ This document outlines the tasks required to implement a Minimum Viable Product 
 - [X] **Create `src/models/nutritional_info.py`** - Nutritional information model with macro calculations
 - [X] **Create `src/models/__init__.py`** - Export all models and enums for easy importing
 
-### 3. Implement Database Operations
-- [ ] **Create `src/database/connection.py`** - Database connection management
-- [ ] **Create `src/database/recipe_repository.py`** - Recipe CRUD operations
-- [ ] **Create `src/database/meal_plan_repository.py`** - Meal plan CRUD operations
-- [ ] **Create `src/database/grocery_repository.py`** - Grocery list CRUD operations
-- [ ] **Create `src/database/__init__.py`** - Export database classes
+### 3. Implement Database Operations ✅ COMPLETED
+- [X] **Create `src/database/connection.py`** - Database connection management with context managers, auto-commit/rollback
+- [X] **Create `src/database/base_repository.py`** - Base repository class with common CRUD operations  
+- [X] **Create `src/database/recipe_repository.py`** - Recipe CRUD operations with ingredient relationships
+- [X] **Create `src/database/meal_plan_repository.py`** - Meal plan CRUD operations with meal relationships
+- [X] **Create `src/database/grocery_repository.py`** - Grocery list CRUD operations with item management
+- [X] **Create `src/database/__init__.py`** - Export database classes and connection utilities
 
 ### 4. Fix Tool Implementations
 - [ ] **Update `DatabaseTool`** - Connect to actual database operations
