@@ -15,17 +15,18 @@ This document outlines the tasks required to implement a Minimum Viable Product 
 ## 🔥 Critical Priority (Must Complete First)
 
 ### 1. Fix Dependencies & Environment Setup
-- [ ] **Fix sqlite3 dependency** - Add back to requirements.txt (it's a built-in module but may need explicit handling)
+- [X] **Fix sqlite3 dependency** - Add back to requirements.txt (it's a built-in module but may need explicit handling)
 - [ ] **Test installation process** - Verify all dependencies install correctly
-- [ ] **Create .env file** - Copy from env_example.txt and add placeholder API keys
-- [ ] **Test database initialization** - Run `python scripts/init_db.py` successfully
+- [X] **Create .env file** - Copy from env_example.txt and add placeholder API keys
+- [X] **Test database initialization** - Run `python scripts/init_db.py` successfully
 
-### 2. Implement Core Data Models
-- [ ] **Create `src/models/recipe.py`** - Recipe data model with Pydantic
-- [ ] **Create `src/models/ingredient.py`** - Ingredient data model
-- [ ] **Create `src/models/meal_plan.py`** - MealPlan data model
-- [ ] **Create `src/models/grocery_list.py`** - GroceryList data model
-- [ ] **Create `src/models/__init__.py`** - Export all models
+### 2. Implement Core Data Models ✅ COMPLETED
+- [X] **Create `src/models/recipe.py`** - Recipe data model with Pydantic validation, enums, helper methods
+- [X] **Create `src/models/ingredient.py`** - Ingredient models with categories, units, recipe ingredients
+- [X] **Create `src/models/meal_plan.py`** - MealPlan and Meal models with date validation and utilities
+- [X] **Create `src/models/grocery_list.py`** - GroceryList and GroceryItem models with shopping features
+- [X] **Create `src/models/nutritional_info.py`** - Nutritional information model with macro calculations
+- [X] **Create `src/models/__init__.py`** - Export all models and enums for easy importing
 
 ### 3. Implement Database Operations
 - [ ] **Create `src/database/connection.py`** - Database connection management
