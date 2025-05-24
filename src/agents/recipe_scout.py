@@ -5,6 +5,7 @@ Recipe Scout Agent - Discovers and retrieves recipes from external sources.
 import os
 from crewai import Agent
 from src.tools.web_tools import WebScrapingTool, RecipeAPITool, ContentFilterTool
+from src.tools.database_tools import DatabaseTool, RecipeValidatorTool
 
 
 class RecipeScoutAgent:
@@ -23,7 +24,9 @@ class RecipeScoutAgent:
         self.tools = [
             WebScrapingTool(),
             RecipeAPITool(),
-            ContentFilterTool()
+            ContentFilterTool(),
+            DatabaseTool(),
+            RecipeValidatorTool()
         ]
         
         # Check if OpenAI API key is available

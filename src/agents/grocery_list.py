@@ -5,6 +5,7 @@ Grocery List Agent - Generates and optimizes grocery shopping lists.
 import os
 from crewai import Agent
 from src.tools.grocery_tools import InventoryTool, PriceComparisonTool, ListOptimizationTool
+from src.tools.database_tools import DatabaseTool
 
 
 class GroceryListAgent:
@@ -23,7 +24,8 @@ class GroceryListAgent:
         self.tools = [
             InventoryTool(),
             PriceComparisonTool(),
-            ListOptimizationTool()
+            ListOptimizationTool(),
+            DatabaseTool()  # Added for accessing meal plan and recipe data
         ]
         
         # Check if OpenAI API key is available

@@ -36,38 +36,46 @@ This document outlines the tasks required to implement a Minimum Viable Product 
 - [X] **Create `src/database/grocery_repository.py`** - Grocery list CRUD operations with item management
 - [X] **Create `src/database/__init__.py`** - Export database classes and connection utilities
 
-### 4. Fix Tool Implementations
-- [ ] **Update `DatabaseTool`** - Connect to actual database operations
-- [ ] **Update `RecipeValidatorTool`** - Implement basic recipe validation
-- [ ] **Update `RecipeSearchTool`** - Implement database search functionality
-- [ ] **Update `MealPlanningTool`** - Basic meal plan creation logic
-- [ ] **Update `ListOptimizationTool`** - Basic grocery list generation
+### 4. Fix Tool Implementations ✅ COMPLETED
+- [X] **Update `DatabaseTool`** - Connect to actual database operations
+- [X] **Update `RecipeValidatorTool`** - Implement basic recipe validation
+- [X] **Update `RecipeSearchTool`** - Implement database search functionality
+- [X] **Update `MealPlanningTool`** - Basic meal plan creation logic
+- [X] **Update `ListOptimizationTool`** - Basic grocery list generation
+
+### 5. Agent Integration ✅ COMPLETED
+- [X] **Update `RecipeManagerAgent`** - Align with database and validation tools
+- [X] **Update `MealPlannerAgent`** - Integrate meal planning and nutrition tools
+- [X] **Update `GroceryListAgent`** - Connect grocery optimization tools
+- [X] **Update `RecipeScoutAgent`** - Integrate web scraping and validation tools
+- [X] **Create agent collection functions** - Easy access to agent groups
+- [X] **Test agent-tool integration** - Verify all agents work with their tools
 
 ---
 
 ## 🚀 High Priority (Core MVP Features)
 
-### 5. Recipe Management System
+### 6. Recipe Management System
 - [ ] **Implement recipe storage** - Save recipes to database with validation
 - [ ] **Implement recipe retrieval** - Get recipes by ID, filters, search terms
 - [ ] **Add sample recipes** - Create 20-30 sample recipes for testing
 - [ ] **Recipe validation logic** - Ensure required fields, validate data types
 - [ ] **Ingredient normalization** - Standardize ingredient names and units
 
-### 6. Meal Planning System
+### 7. Meal Planning System
 - [ ] **Basic meal plan creation** - Generate simple meal plans
 - [ ] **Recipe selection logic** - Choose recipes based on criteria
 - [ ] **Nutritional balance** - Basic calorie and macro tracking
 - [ ] **Meal plan storage** - Save and retrieve meal plans from database
 - [ ] **Date/calendar integration** - Assign recipes to specific days
 
-### 7. Grocery List Generation
+### 8. Grocery List Generation
 - [ ] **Extract ingredients from meal plans** - Parse all recipes in a meal plan
 - [ ] **Consolidate ingredients** - Combine duplicate ingredients with quantities
 - [ ] **Basic categorization** - Group items by store sections
 - [ ] **Generate shopping list** - Create formatted grocery list output
 
-### 8. CLI Interface for Testing
+### 9. CLI Interface for Testing
 - [ ] **Create `src/cli.py`** - Command-line interface for MVP testing
 - [ ] **Add recipe commands** - `add-recipe`, `list-recipes`, `search-recipes`
 - [ ] **Add meal plan commands** - `create-meal-plan`, `show-meal-plan`
@@ -78,21 +86,21 @@ This document outlines the tasks required to implement a Minimum Viable Product 
 
 ## 🎨 Medium Priority (Polish & Enhancement)
 
-### 9. Error Handling & Validation
+### 10. Error Handling & Validation
 - [ ] **Add input validation** - Validate all user inputs and API calls
 - [ ] **Error handling in agents** - Graceful failure handling in CrewAI agents
 - [ ] **Database error handling** - Handle connection issues, constraint violations
 - [ ] **Logging improvements** - Add structured logging throughout application
 - [ ] **User-friendly error messages** - Clear error messages for end users
 
-### 10. Basic Testing
+### 11. Basic Testing
 - [ ] **Create `tests/test_models.py`** - Test data models
 - [ ] **Create `tests/test_database.py`** - Test database operations
 - [ ] **Create `tests/test_tools.py`** - Test tool implementations
 - [ ] **Create `tests/test_agents.py`** - Test agent interactions
 - [ ] **Create `tests/test_cli.py`** - Test CLI functionality
 
-### 11. Sample Data & Demo
+### 12. Sample Data & Demo
 - [ ] **Create sample recipe data** - JSON file with diverse recipes
 - [ ] **Data import script** - Load sample recipes into database
 - [ ] **Demo scenarios** - Pre-defined meal planning scenarios
@@ -102,20 +110,20 @@ This document outlines the tasks required to implement a Minimum Viable Product 
 
 ## 🔮 Low Priority (Future Enhancements)
 
-### 12. External Recipe Discovery
+### 13. External Recipe Discovery
 - [ ] **Mock API responses** - Simulate external recipe sources for testing
 - [ ] **Recipe API integration** - Connect to Spoonacular or Edamam (optional)
 - [ ] **Web scraping** - Basic recipe extraction from cooking websites
 - [ ] **Content filtering** - Quality control for external recipes
 
-### 13. Advanced Features
+### 14. Advanced Features
 - [ ] **Nutritional analysis** - Detailed macro/micronutrient tracking
 - [ ] **Dietary restriction handling** - Advanced filtering and substitutions
 - [ ] **Budget optimization** - Cost-aware meal planning
 - [ ] **Seasonal ingredients** - Ingredient availability and pricing
 - [ ] **Recipe recommendations** - ML-based recipe suggestions
 
-### 14. User Interface
+### 15. User Interface
 - [ ] **Web interface** - Simple Flask/FastAPI web UI
 - [ ] **Recipe cards** - Formatted recipe display
 - [ ] **Meal plan calendar** - Visual meal planning interface

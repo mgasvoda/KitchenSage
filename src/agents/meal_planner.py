@@ -5,6 +5,7 @@ Meal Planner Agent - Handles meal planning and nutritional analysis.
 import os
 from crewai import Agent
 from src.tools.meal_planning_tools import MealPlanningTool, NutritionAnalysisTool, CalendarTool
+from src.tools.database_tools import RecipeSearchTool
 
 
 class MealPlannerAgent:
@@ -23,7 +24,8 @@ class MealPlannerAgent:
         self.tools = [
             MealPlanningTool(),
             NutritionAnalysisTool(),
-            CalendarTool()
+            CalendarTool(),
+            RecipeSearchTool()
         ]
         
         # Check if OpenAI API key is available
