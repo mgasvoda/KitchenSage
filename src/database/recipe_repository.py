@@ -201,14 +201,53 @@ class RecipeRepository(BaseRepository[Recipe]):
                 'notes': recipe_create.notes,
                 'source': recipe_create.source,
                 'image_url': recipe_create.image_url,
+                'created_at': datetime.now().isoformat(),
+                'updated_at': datetime.now().isoformat()
             }
             
-            # Create recipe
-            recipe_id = self.create(recipe_data)
-            
-            # Add ingredients if provided
-            if ingredients:
-                self._add_recipe_ingredients(recipe_id, ingredients)
+            # Use a single database session for everything
+            with get_db_session() as conn:
+                cursor = conn.cursor()
+                
+                # Insert recipe
+                columns = list(recipe_data.keys())
+                placeholders = ', '.join(['?' for _ in columns])
+                values = list(recipe_data.values())
+                
+                recipe_query = f"""
+                    INSERT INTO recipes ({', '.join(columns)})
+                    VALUES ({placeholders})
+                """
+                
+                cursor.execute(recipe_query, values)
+                recipe_id = cursor.lastrowid
+                
+                # Add ingredients if provided
+                if ingredients:
+                    for ingredient_data in ingredients:
+                        # Get or create ingredient within the same session
+                        ingredient = self._get_or_create_ingredient_in_session(
+                            cursor, 
+                            ingredient_data['name'],
+                            ingredient_data.get('category', IngredientCategory.OTHER)
+                        )
+                        
+                        # Insert recipe ingredient relationship
+                        cursor.execute("""
+                            INSERT INTO recipe_ingredients 
+                            (recipe_id, ingredient_id, quantity, unit, notes, optional, substitutes)
+                            VALUES (?, ?, ?, ?, ?, ?, ?)
+                        """, (
+                            recipe_id,
+                            ingredient.id,
+                            ingredient_data['quantity'],
+                            ingredient_data['unit'],
+                            ingredient_data.get('notes'),
+                            ingredient_data.get('optional', False),
+                            json.dumps(ingredient_data.get('substitutes', []))
+                        ))
+                
+                self.logger.info(f"Created recipe with ID: {recipe_id}")
             
             # Return full recipe with ingredients
             return self.get_recipe_with_ingredients(recipe_id)
@@ -216,6 +255,48 @@ class RecipeRepository(BaseRepository[Recipe]):
         except Exception as e:
             self.logger.error(f"Error creating recipe: {e}")
             raise
+    
+    def _get_or_create_ingredient_in_session(self, cursor: sqlite3.Cursor, name: str, category: IngredientCategory = IngredientCategory.OTHER) -> Ingredient:
+        """
+        Get an ingredient by name or create it if it doesn't exist, within an existing database session.
+        
+        Args:
+            cursor: Database cursor within an active session
+            name: Ingredient name (will be normalized)
+            category: Ingredient category
+            
+        Returns:
+            Ingredient instance
+        """
+        # Normalize name
+        normalized_name = name.strip().lower()
+        
+        # Try to find existing ingredient
+        cursor.execute("SELECT * FROM ingredients WHERE name = ?", (normalized_name,))
+        row = cursor.fetchone()
+        
+        if row:
+            return self.ingredient_repo._row_to_model(row)
+        
+        # Create new ingredient
+        cursor.execute("""
+            INSERT INTO ingredients (name, category, created_at, updated_at)
+            VALUES (?, ?, ?, ?)
+        """, (
+            normalized_name,
+            category.value,
+            datetime.now().isoformat(),
+            datetime.now().isoformat()
+        ))
+        
+        ingredient_id = cursor.lastrowid
+        
+        return Ingredient(
+            id=ingredient_id,
+            name=normalized_name,
+            category=category,
+            created_at=datetime.now()
+        )
     
     def get_recipe_with_ingredients(self, recipe_id: int) -> Optional[Recipe]:
         """
