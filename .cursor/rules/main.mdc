@@ -1,0 +1,347 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Cursor Rules for KitchenCrew Project
+
+## Project Overview
+KitchenCrew is an AI-powered cooking assistant built with CrewAI framework, featuring recipe management, meal planning, and grocery list generation.
+
+## Development Environment
+
+### Package Management
+- **Use `uv` for all dependency management** instead of pip
+- Install dependencies: `uv add <package>`
+- Remove dependencies: `uv remove <package>`
+- Sync environment: `uv sync`
+- Update requirements.txt: `uv pip freeze > requirements.txt`
+
+### Virtual Environment
+- **Always activate virtual environment before running commands**
+- Create venv: `uv venv`
+- Activate (PowerShell): `.\venv\Scripts\Activate.ps1` or `.venv\Scripts\Activate.ps1`
+- All Python commands should run within the virtual environment
+- Verify environment: `uv pip list`
+
+### Terminal Commands
+- **Use PowerShell syntax for all terminal commands**
+- Use `New-Item` instead of `mkdir` for creating directories
+- Use backslashes (`\`) for Windows paths in commands
+- Use `Get-ChildItem` or `ls` for listing directories
+- Use `Copy-Item` for copying files
+
+## Code Structure and Conventions
+
+### File Organization
+```
+src/
+├── agents/          # CrewAI agent definitions
+├── tasks/           # Task definitions for agents
+├── tools/           # Custom tools for agents
+├── models/          # Pydantic data models
+├── database/        # Database operations and repositories
+├── utils/           # Utility functions
+└── cli.py           # Command-line interface
+```
+
+### Naming Conventions
+- **Files**: Use snake_case (e.g., `recipe_manager.py`)
+- **Classes**: Use PascalCase (e.g., `RecipeManager`)
+- **Functions/Methods**: Use snake_case (e.g., `create_meal_plan`)
+- **Constants**: Use UPPER_SNAKE_CASE (e.g., `DEFAULT_SERVINGS`)
+- **Database tables**: Use snake_case (e.g., `recipe_ingredients`)
+
+### Import Organization
+```python
+# Standard library imports
+import os
+import logging
+from datetime import datetime
+from typing import List, Dict, Any, Optional
+
+# Third-party imports
+from pydantic import BaseModel
+from crewai import Agent, Task, Crew
+
+# Local imports
+from src.models.recipe import Recipe
+from src.database.connection import get_db_connection
+```
+
+## CrewAI Patterns
+
+### Agent Definition
+```python
+class ExampleAgent:
+    def __init__(self):
+        self.tools = [Tool1(), Tool2()]
+        self.agent = Agent(
+            role="Specific Role",
+            goal="Clear, measurable goal",
+            backstory="Detailed professional background",
+            tools=self.tools,
+            verbose=True,
+            allow_delegation=False,
+            llm=ChatOpenAI(model="gpt-4", temperature=0.1)
+        )
+```
+
+### Task Definition
+```python
+def example_task(self, input_data: Dict[str, Any]) -> Task:
+    return Task(
+        description=f"""
+        Clear, detailed task description with:
+        1. Specific steps to follow
+        2. Input data: {input_data}
+        3. Expected processing
+        4. Output requirements
+        """,
+        expected_output="Specific format and content expectations",
+        async_execution=False
+    )
+```
+
+### Tool Implementation
+```python
+class ExampleTool(BaseTool):
+    name: str = "Tool Name"
+    description: str = "Clear description of what this tool does"
+    
+    def _run(self, input_param: str) -> Dict[str, Any]:
+        """
+        Tool implementation with proper error handling.
+        
+        Args:
+            input_param: Description of parameter
+            
+        Returns:
+            Dictionary with result and status
+        """
+        try:
+            # Implementation here
+            return {"status": "success", "data": result}
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+```
+
+## Database Patterns
+
+### Repository Pattern
+```python
+class ExampleRepository:
+    def __init__(self, db_connection):
+        self.db = db_connection
+    
+    def create(self, data: Dict[str, Any]) -> int:
+        """Create record and return ID"""
+        
+    def get_by_id(self, id: int) -> Optional[Dict[str, Any]]:
+        """Get single record by ID"""
+        
+    def get_by_criteria(self, **criteria) -> List[Dict[str, Any]]:
+        """Get records matching criteria"""
+        
+    def update(self, id: int, data: Dict[str, Any]) -> bool:
+        """Update record by ID"""
+        
+    def delete(self, id: int) -> bool:
+        """Delete record by ID"""
+```
+
+### Database Connection
+```python
+# Always use context managers for database connections
+with get_db_connection() as conn:
+    cursor = conn.cursor()
+    # Database operations
+    conn.commit()
+```
+
+## Pydantic Models
+
+### Base Model Pattern
+```python
+from pydantic import BaseModel, Field, validator
+from typing import List, Optional
+from datetime import datetime
+
+class Recipe(BaseModel):
+    id: Optional[int] = None
+    name: str = Field(..., min_length=1, max_length=200)
+    ingredients: List[Ingredient]
+    prep_time: int = Field(..., gt=0)  # Greater than 0
+    created_at: Optional[datetime] = None
+    
+    @validator('name')
+    def validate_name(cls, v):
+        return v.strip().title()
+    
+    class Config:
+        from_attributes = True  # For SQLAlchemy compatibility
+```
+
+## Error Handling
+
+### Standard Error Pattern
+```python
+import logging
+
+logger = logging.getLogger(__name__)
+
+def example_function():
+    try:
+        # Operation that might fail
+        result = risky_operation()
+        return {"status": "success", "data": result}
+    except SpecificException as e:
+        logger.error(f"Specific error in {__name__}: {e}")
+        return {"status": "error", "message": f"Specific error: {e}"}
+    except Exception as e:
+        logger.error(f"Unexpected error in {__name__}: {e}")
+        return {"status": "error", "message": "An unexpected error occurred"}
+```
+
+## Testing Patterns
+
+### Test File Structure
+```python
+import pytest
+from unittest.mock import Mock, patch
+from src.models.recipe import Recipe
+
+class TestRecipe:
+    def test_valid_recipe_creation(self):
+        """Test creating a valid recipe"""
+        
+    def test_invalid_recipe_validation(self):
+        """Test recipe validation failures"""
+        
+    @pytest.fixture
+    def sample_recipe(self):
+        """Fixture providing sample recipe data"""
+        return Recipe(name="Test Recipe", ...)
+```
+
+### Mock Database Operations
+```python
+@patch('src.database.connection.get_db_connection')
+def test_database_operation(mock_db):
+    mock_conn = Mock()
+    mock_db.return_value.__enter__.return_value = mock_conn
+    # Test implementation
+```
+
+## CLI Development
+
+### Click Pattern
+```python
+import click
+from src.crew import KitchenCrew
+
+@click.group()
+def cli():
+    """KitchenCrew CLI"""
+    pass
+
+@cli.command()
+@click.option('--name', required=True, help='Recipe name')
+@click.option('--cuisine', help='Cuisine type')
+def add_recipe(name, cuisine):
+    """Add a new recipe to the database"""
+    try:
+        crew = KitchenCrew()
+        result = crew.add_recipe({"name": name, "cuisine": cuisine})
+        click.echo(f"Recipe added: {result}")
+    except Exception as e:
+        click.echo(f"Error: {e}", err=True)
+```
+
+## Development Workflow
+
+### Before Starting Work
+1. Activate virtual environment: `.\venv\Scripts\Activate.ps1`
+2. Update dependencies: `uv sync`
+3. Check current branch: `git branch`
+4. Run tests to ensure clean state: `uv run pytest`
+
+### Adding New Dependencies
+1. Add to project: `uv add <package>`
+2. Update requirements.txt: `uv pip freeze > requirements.txt`
+3. Commit both pyproject.toml and requirements.txt changes
+
+### Running the Application
+```powershell
+# Always ensure virtual environment is active
+.\venv\Scripts\Activate.ps1
+
+# Run main application
+uv run python main.py
+
+# Run CLI commands
+uv run python -m src.cli --help
+
+# Run tests
+uv run pytest
+
+# Initialize database
+uv run python scripts/init_db.py
+```
+
+### Environment Variables
+- Copy `env_example.txt` to `.env`
+- Never commit `.env` file
+- Validate all required environment variables are loaded at startup
+- Use `python-dotenv` for loading environment variables
+
+## Code Quality Guidelines
+
+### Logging
+```python
+import logging
+logger = logging.getLogger(__name__)
+
+# Use appropriate log levels
+logger.debug("Detailed debugging information")
+logger.info("General information about program execution")
+logger.warning("Something unexpected happened")
+logger.error("Error occurred but program continues")
+logger.critical("Serious error occurred, program may stop")
+```
+
+### Documentation
+- All classes and functions must have docstrings
+- Use Google-style docstrings
+- Include type hints for all function parameters and returns
+- Update README.md when adding new features
+
+### Performance Considerations
+- Use database connections efficiently (context managers)
+- Implement pagination for large result sets
+- Cache frequently accessed data when appropriate
+- Use async patterns for I/O operations when possible
+
+## Project-Specific Notes
+
+### MVP Priority
+- Focus on Critical and High Priority items from `docs/MVP_TODO.md`
+- Database operations before AI features
+- Simple functionality before advanced features
+- CLI interface before web interface
+
+### CrewAI Integration
+- Ensure agents can pass data between tasks
+- Test agent workflows end-to-end
+- Keep tool implementations focused and single-purpose
+- Use proper task descriptions for better AI performance
+
+### Data Validation
+- Validate all inputs at the API boundary
+- Use Pydantic models for data validation
+- Implement proper error messages for users
+- Handle edge cases gracefully
+
+---
+
+**Remember**: Always work within the virtual environment and use uv for package management. Follow the MVP todo list priorities and maintain clean, testable code. 

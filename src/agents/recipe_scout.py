@@ -2,8 +2,8 @@
 Recipe Scout Agent - Discovers and retrieves recipes from external sources.
 """
 
+import os
 from crewai import Agent
-from langchain_openai import ChatOpenAI
 from src.tools.web_tools import WebScrapingTool, RecipeAPITool, ContentFilterTool
 
 
@@ -26,6 +26,15 @@ class RecipeScoutAgent:
             ContentFilterTool()
         ]
         
+        # Check if OpenAI API key is available
+        api_key = os.getenv('OPENAI_API_KEY')
+        if not api_key or api_key.startswith('sk-placeholder'):
+            print("Warning: OpenAI API key not available - recipe scout will use basic functionality only")
+            llm_config = {}
+        else:
+            from langchain_openai import ChatOpenAI
+            llm_config = {"llm": ChatOpenAI(model="gpt-4", temperature=0.4)}
+        
         self.agent = Agent(
             role="Culinary Researcher and Recipe Discovery Specialist",
             goal="Find and retrieve relevant recipes from various external sources",
@@ -38,5 +47,5 @@ class RecipeScoutAgent:
             tools=self.tools,
             verbose=True,
             allow_delegation=False,
-            llm=ChatOpenAI(model="gpt-4", temperature=0.4)
+            **llm_config
         ) 

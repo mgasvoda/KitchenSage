@@ -2,7 +2,7 @@
 Grocery tools for shopping list generation and optimization.
 """
 
-from crewai_tools import BaseTool
+from crewai.tools import BaseTool
 from typing import Dict, List, Any, Optional
 
 

@@ -2,7 +2,7 @@
 Meal planning tools for nutritional analysis and meal optimization.
 """
 
-from crewai_tools import BaseTool
+from crewai.tools import BaseTool
 from typing import Dict, List, Any, Optional
 from datetime import datetime, date
 

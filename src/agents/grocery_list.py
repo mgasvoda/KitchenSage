@@ -2,8 +2,8 @@
 Grocery List Agent - Generates and optimizes grocery shopping lists.
 """
 
+import os
 from crewai import Agent
-from langchain_openai import ChatOpenAI
 from src.tools.grocery_tools import InventoryTool, PriceComparisonTool, ListOptimizationTool
 
 
@@ -26,6 +26,15 @@ class GroceryListAgent:
             ListOptimizationTool()
         ]
         
+        # Check if OpenAI API key is available
+        api_key = os.getenv('OPENAI_API_KEY')
+        if not api_key or api_key.startswith('sk-placeholder'):
+            print("Warning: OpenAI API key not available - grocery list agent will use basic functionality only")
+            llm_config = {}
+        else:
+            from langchain_openai import ChatOpenAI
+            llm_config = {"llm": ChatOpenAI(model="gpt-4", temperature=0.2)}
+        
         self.agent = Agent(
             role="Supply Chain Specialist and Shopping Optimization Expert",
             goal="Generate efficient and cost-optimized grocery lists from meal plans",
@@ -38,5 +47,5 @@ class GroceryListAgent:
             tools=self.tools,
             verbose=True,
             allow_delegation=False,
-            llm=ChatOpenAI(model="gpt-4", temperature=0.2)
+            **llm_config
         ) 

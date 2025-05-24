@@ -22,6 +22,17 @@ def main():
     
     logger.info("Starting KitchenCrew application")
     
+    # Debug: Check if environment variables are loaded
+    api_key = os.getenv('OPENAI_API_KEY')
+    if api_key:
+        logger.info(f"OpenAI API key loaded: {api_key[:10]}..." if len(api_key) > 10 else "OpenAI API key loaded (short)")
+    else:
+        logger.warning("OpenAI API key not found in environment variables")
+        logger.info("Available environment variables starting with OPENAI:")
+        for key, value in os.environ.items():
+            if key.startswith('OPENAI'):
+                logger.info(f"  {key}: {value[:10]}..." if len(value) > 10 else f"  {key}: {value}")
+    
     try:
         # Initialize the crew
         crew = KitchenCrew()

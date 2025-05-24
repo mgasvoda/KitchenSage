@@ -2,8 +2,8 @@
 Meal Planner Agent - Handles meal planning and nutritional analysis.
 """
 
+import os
 from crewai import Agent
-from langchain_openai import ChatOpenAI
 from src.tools.meal_planning_tools import MealPlanningTool, NutritionAnalysisTool, CalendarTool
 
 
@@ -26,6 +26,15 @@ class MealPlannerAgent:
             CalendarTool()
         ]
         
+        # Check if OpenAI API key is available
+        api_key = os.getenv('OPENAI_API_KEY')
+        if not api_key or api_key.startswith('sk-placeholder'):
+            print("Warning: OpenAI API key not available - meal planner will use basic functionality only")
+            llm_config = {}
+        else:
+            from langchain_openai import ChatOpenAI
+            llm_config = {"llm": ChatOpenAI(model="gpt-4", temperature=0.3)}
+        
         self.agent = Agent(
             role="Certified Nutritionist and Meal Planning Expert",
             goal="Create optimal meal plans based on nutritional needs, preferences, and constraints",
@@ -38,5 +47,5 @@ class MealPlannerAgent:
             tools=self.tools,
             verbose=True,
             allow_delegation=False,
-            llm=ChatOpenAI(model="gpt-4", temperature=0.3)
+            **llm_config
         ) 
