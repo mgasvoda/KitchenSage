@@ -12,12 +12,14 @@ from .recipe_manager import RecipeManagerAgent
 from .meal_planner import MealPlannerAgent
 from .grocery_list import GroceryListAgent
 from .recipe_scout import RecipeScoutAgent
+from .orchestrator import OrchestratorAgent
 
 __all__ = [
     "RecipeManagerAgent",
     "MealPlannerAgent", 
     "GroceryListAgent",
-    "RecipeScoutAgent"
+    "RecipeScoutAgent",
+    "OrchestratorAgent"
 ]
 
 

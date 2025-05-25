@@ -160,12 +160,18 @@ KitchenCrew/
 
 ## CLI Architecture
 
-The CLI uses a sophisticated natural language processing system:
+The CLI uses an AI-powered orchestrator agent for natural language understanding:
 
-1. **CommandParser**: Analyzes user input using regex patterns to identify intent and extract parameters
-2. **KitchenCrewCLI**: Manages the chat interface and conversation flow
+1. **OrchestratorAgent**: AI agent that understands user intent and extracts parameters from natural language
+2. **OrchestratedKitchenCrewCLI**: Manages the chat interface and conversation flow with context awareness
 3. **CrewAI Integration**: Routes parsed commands to appropriate AI agents through the KitchenCrew orchestrator
 4. **Rich Display**: Provides beautiful, formatted output with colors, panels, and tables
+
+**Key Features:**
+- Natural language understanding instead of rigid command patterns
+- Context-aware conversations that remember previous interactions
+- Intelligent clarification when user intent is unclear
+- Flexible intent recognition that adapts to user phrasing
 
 ### Supported Parameters
 

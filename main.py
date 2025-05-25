@@ -22,7 +22,7 @@ from src.utils.telemetry import initialize_phoenix_tracing
 # Initialize telemetry
 tracer_provider = initialize_phoenix_tracing(project_name="kitchencrew")
 
-from src.cli import cli
+from src.cli_orchestrated import cli
 
 if __name__ == "__main__":
     cli() 
