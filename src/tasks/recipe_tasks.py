@@ -110,4 +110,46 @@ class RecipeTasks:
             """,
             expected_output="Ranked list of recipes with ingredient match percentages and analysis",
             async_execution=False
+        )
+    
+    def search_stored_recipes_task(self,
+                                  cuisine: Optional[str] = None,
+                                  dietary_restrictions: Optional[List[str]] = None,
+                                  ingredients: Optional[List[str]] = None,
+                                  max_prep_time: Optional[int] = None) -> Task:
+        """
+        Task to search recipes that are already stored in the database.
+        
+        Args:
+            cuisine: Type of cuisine (e.g., "italian", "mexican")
+            dietary_restrictions: List of dietary restrictions
+            ingredients: Available ingredients to use
+            max_prep_time: Maximum preparation time in minutes
+            
+        Returns:
+            CrewAI Task object
+        """
+        restrictions_text = ", ".join(dietary_restrictions) if dietary_restrictions else "None"
+        ingredients_text = ", ".join(ingredients) if ingredients else "Any"
+        
+        return Task(
+            description=f"""
+            Search the stored recipe database for recipes matching these criteria:
+            - Cuisine type: {cuisine or "Any"}
+            - Dietary restrictions: {restrictions_text}
+            - Available ingredients: {ingredients_text}
+            - Maximum prep time: {max_prep_time or "No limit"} minutes
+            
+            Search through the database and return recipes that match the criteria:
+            1. Filter by cuisine type if specified
+            2. Exclude recipes that don't meet dietary restrictions
+            3. Prioritize recipes that use available ingredients
+            4. Filter by preparation time if specified
+            5. Rank results by relevance and match quality
+            
+            Return detailed recipe information including ingredients, instructions, 
+            nutritional data, and preparation time.
+            """,
+            expected_output="List of matching recipes from database with detailed information and relevance scores",
+            async_execution=False
         ) 

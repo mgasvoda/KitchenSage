@@ -30,7 +30,7 @@ class RecipeManagerAgent:
             llm_config = {}
         else:
             from langchain_openai import ChatOpenAI
-            llm_config = {"llm": ChatOpenAI(model="gpt-4", temperature=0.1)}
+            llm_config = {"llm": ChatOpenAI(model="gpt-4.1-mini", temperature=0.1)}
         
         self.agent = Agent(
             role="Recipe Database Manager",

@@ -34,7 +34,7 @@ class RecipeScoutAgent:
             llm_config = {}
         else:
             from langchain_openai import ChatOpenAI
-            llm_config = {"llm": ChatOpenAI(model="gpt-4", temperature=0.4)}
+            llm_config = {"llm": ChatOpenAI(model="gpt-4.1-mini", temperature=0.4)}
         
         self.agent = Agent(
             role="Culinary Researcher and Recipe Discovery Specialist",

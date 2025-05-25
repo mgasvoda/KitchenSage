@@ -107,18 +107,23 @@ class KitchenCrew:
         """
         self.logger.info(f"Creating meal plan for {days} days, {people} people")
         
+        # Create meal planning task with proper agent assignment
+        meal_plan_task = self.meal_planning_tasks.create_meal_plan_task(
+            days=days,
+            people=people,
+            dietary_restrictions=dietary_restrictions,
+            budget=budget
+        )
+        meal_plan_task.agent = self.meal_planner.agent
+        
+        # Create recipe fetching task with proper agent assignment
+        recipe_fetch_task = self.recipe_tasks.fetch_recipes_for_plan_task()
+        recipe_fetch_task.agent = self.recipe_manager.agent
+        
         # Create meal planning crew
         planning_crew = Crew(
             agents=[self.meal_planner.agent, self.recipe_manager.agent],
-            tasks=[
-                self.meal_planning_tasks.create_meal_plan_task(
-                    days=days,
-                    people=people,
-                    dietary_restrictions=dietary_restrictions,
-                    budget=budget
-                ),
-                self.recipe_tasks.fetch_recipes_for_plan_task()
-            ],
+            tasks=[meal_plan_task, recipe_fetch_task],
             process=Process.sequential,
             verbose=True
         )
@@ -138,13 +143,18 @@ class KitchenCrew:
         """
         self.logger.info(f"Generating grocery list for meal plan {meal_plan_id}")
         
+        # Create ingredient extraction task with proper agent assignment
+        extract_task = self.grocery_tasks.extract_ingredients_task(meal_plan_id)
+        extract_task.agent = self.recipe_manager.agent
+        
+        # Create grocery optimization task with proper agent assignment
+        optimize_task = self.grocery_tasks.optimize_grocery_list_task()
+        optimize_task.agent = self.grocery_list_agent.agent
+        
         # Create grocery list crew
         grocery_crew = Crew(
             agents=[self.grocery_list_agent.agent, self.recipe_manager.agent],
-            tasks=[
-                self.grocery_tasks.extract_ingredients_task(meal_plan_id),
-                self.grocery_tasks.optimize_grocery_list_task()
-            ],
+            tasks=[extract_task, optimize_task],
             process=Process.sequential,
             verbose=True
         )
@@ -164,12 +174,14 @@ class KitchenCrew:
         """
         self.logger.info(f"Adding new recipe: {recipe_data.get('name', 'Unknown')}")
         
+        # Create recipe addition task with proper agent assignment
+        add_task = self.recipe_tasks.add_recipe_task(recipe_data)
+        add_task.agent = self.recipe_manager.agent
+        
         # Create recipe addition crew
         addition_crew = Crew(
             agents=[self.recipe_manager.agent],
-            tasks=[
-                self.recipe_tasks.add_recipe_task(recipe_data)
-            ],
+            tasks=[add_task],
             process=Process.sequential,
             verbose=True
         )
@@ -189,13 +201,18 @@ class KitchenCrew:
         """
         self.logger.info(f"Getting suggestions for ingredients: {available_ingredients}")
         
+        # Create ingredient-based recipe search task with proper agent assignment
+        search_task = self.recipe_tasks.find_recipes_by_ingredients_task(available_ingredients)
+        search_task.agent = self.recipe_manager.agent
+        
+        # Create recipe ranking task with proper agent assignment
+        ranking_task = self.meal_planning_tasks.rank_recipe_suggestions_task()
+        ranking_task.agent = self.meal_planner.agent
+        
         # Create suggestion crew
         suggestion_crew = Crew(
             agents=[self.recipe_manager.agent, self.meal_planner.agent],
-            tasks=[
-                self.recipe_tasks.find_recipes_by_ingredients_task(available_ingredients),
-                self.meal_planning_tasks.rank_recipe_suggestions_task()
-            ],
+            tasks=[search_task, ranking_task],
             process=Process.sequential,
             verbose=True
         )
@@ -223,17 +240,19 @@ class KitchenCrew:
         self.logger.info(f"Searching stored recipes with criteria: cuisine={cuisine}, "
                         f"dietary_restrictions={dietary_restrictions}")
         
+        # Create database search task with proper agent assignment
+        search_task = self.recipe_tasks.search_stored_recipes_task(
+            cuisine=cuisine,
+            dietary_restrictions=dietary_restrictions,
+            ingredients=ingredients,
+            max_prep_time=max_prep_time
+        )
+        search_task.agent = self.recipe_manager.agent
+        
         # Create database search crew (only recipe manager, no scout)
         search_crew = Crew(
             agents=[self.recipe_manager.agent],
-            tasks=[
-                self.recipe_tasks.search_stored_recipes_task(
-                    cuisine=cuisine,
-                    dietary_restrictions=dietary_restrictions,
-                    ingredients=ingredients,
-                    max_prep_time=max_prep_time
-                )
-            ],
+            tasks=[search_task],
             process=Process.sequential,
             verbose=True
         )

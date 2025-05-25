@@ -35,7 +35,7 @@ class GroceryListAgent:
             llm_config = {}
         else:
             from langchain_openai import ChatOpenAI
-            llm_config = {"llm": ChatOpenAI(model="gpt-4", temperature=0.2)}
+            llm_config = {"llm": ChatOpenAI(model="gpt-4.1-mini", temperature=0.2)}
         
         self.agent = Agent(
             role="Supply Chain Specialist and Shopping Optimization Expert",

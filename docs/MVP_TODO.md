@@ -16,7 +16,7 @@ This document outlines the tasks required to implement a Minimum Viable Product 
 
 ### 1. Fix Dependencies & Environment Setup
 - [X] **Fix sqlite3 dependency** - Add back to requirements.txt (it's a built-in module but may need explicit handling)
-- [ ] **Test installation process** - Verify all dependencies install correctly
+- [X] **Test installation process** - Verify all dependencies install correctly
 - [X] **Create .env file** - Copy from env_example.txt and add placeholder API keys
 - [X] **Test database initialization** - Run `python scripts/init_db.py` successfully
 
@@ -56,15 +56,15 @@ This document outlines the tasks required to implement a Minimum Viable Product 
 ## 🚀 High Priority (Core MVP Features)
 
 ### 6. Recipe Management System
-- [ ] **Implement recipe storage** - Save recipes to database with validation
-- [ ] **Implement recipe retrieval** - Get recipes by ID, filters, search terms
-- [ ] **Add sample recipes** - Create 20-30 sample recipes for testing
+- [X] **Implement recipe storage** - Save recipes to database with validation
+- [X] **Implement recipe retrieval** - Get recipes by ID, filters, search terms
+- [Z] **Add sample recipes** - Create 20-30 sample recipes for testing
 - [ ] **Recipe validation logic** - Ensure required fields, validate data types
 - [ ] **Ingredient normalization** - Standardize ingredient names and units
 
 ### 7. Meal Planning System
-- [ ] **Basic meal plan creation** - Generate simple meal plans
-- [ ] **Recipe selection logic** - Choose recipes based on criteria
+- [X] **Basic meal plan creation** - Generate simple meal plans
+- [X] **Recipe selection logic** - Choose recipes based on criteria
 - [ ] **Nutritional balance** - Basic calorie and macro tracking
 - [ ] **Meal plan storage** - Save and retrieve meal plans from database
 - [ ] **Date/calendar integration** - Assign recipes to specific days

@@ -35,7 +35,7 @@ class MealPlannerAgent:
             llm_config = {}
         else:
             from langchain_openai import ChatOpenAI
-            llm_config = {"llm": ChatOpenAI(model="gpt-4", temperature=0.3)}
+            llm_config = {"llm": ChatOpenAI(model="gpt-4.1-mini", temperature=0.3)}
         
         self.agent = Agent(
             role="Certified Nutritionist and Meal Planning Expert",
