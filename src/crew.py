@@ -67,30 +67,48 @@ class KitchenCrew:
         self.logger.info(f"Finding recipes with criteria: cuisine={cuisine}, "
                         f"dietary_restrictions={dietary_restrictions}")
         
-        # Create the search task with proper agent assignment
-        search_task = self.discovery_tasks.search_recipes_task(
-            cuisine=cuisine,
-            dietary_restrictions=dietary_restrictions,
-            ingredients=ingredients,
-            max_prep_time=max_prep_time,
-            original_query=original_query,
-            agent=self.recipe_scout.agent
-        )
+        # Debug logging
+        self.logger.debug(f"Parameters received: cuisine={cuisine}, dietary_restrictions={dietary_restrictions}, "
+                         f"ingredients={ingredients}, max_prep_time={max_prep_time}, original_query={original_query}")
         
-        # Create the validation task with proper agent assignment
-        validation_task = self.recipe_tasks.validate_and_store_recipes_task()
-        validation_task.agent = self.recipe_manager.agent
-        
-        # Create discovery crew
-        discovery_crew = Crew(
-            agents=[self.recipe_scout.agent, self.recipe_manager.agent],
-            tasks=[search_task, validation_task],
-            process=Process.sequential,
-            verbose=True
-        )
-        
-        result = discovery_crew.kickoff()
-        return result
+        try:
+            # Create the search task with proper agent assignment
+            search_task = self.discovery_tasks.search_recipes_task(
+                cuisine=cuisine,
+                dietary_restrictions=dietary_restrictions,
+                ingredients=ingredients,
+                max_prep_time=max_prep_time,
+                original_query=original_query,
+                agent=self.recipe_scout.agent
+            )
+            
+            self.logger.debug("Search task created successfully")
+            
+            # Create the validation task with proper agent assignment
+            validation_task = self.recipe_tasks.validate_and_store_recipes_task()
+            validation_task.agent = self.recipe_manager.agent
+            
+            self.logger.debug("Validation task created successfully")
+            
+            # Create discovery crew
+            discovery_crew = Crew(
+                agents=[self.recipe_scout.agent, self.recipe_manager.agent],
+                tasks=[search_task, validation_task],
+                process=Process.sequential,
+                verbose=True
+            )
+            
+            self.logger.debug("Discovery crew created successfully")
+            
+            result = discovery_crew.kickoff()
+            return result
+            
+        except Exception as e:
+            self.logger.error(f"Error in find_recipes: {e}")
+            self.logger.error(f"Error type: {type(e)}")
+            import traceback
+            self.logger.error(f"Traceback: {traceback.format_exc()}")
+            raise
     
     def create_meal_plan(self,
                         days: int = 7,

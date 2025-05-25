@@ -30,6 +30,10 @@ class DiscoveryTasks:
         Returns:
             CrewAI Task object
         """
+        # Safely handle None values and convert to proper types
+        dietary_restrictions = dietary_restrictions or []
+        ingredients = ingredients or []
+        
         criteria = []
         search_query_parts = []
         
@@ -88,7 +92,8 @@ class DiscoveryTasks:
             Return a comprehensive list of recipes that match the search criteria and user's intent.
             """,
             expected_output="List of 5-10 recipes with complete information including ingredients, instructions, prep time, and source metadata",
-            async_execution=False
+            async_execution=False,
+            context=[]  # Explicitly set context to empty list to prevent _NotSpecified error
         )
         
         # Assign agent if provided
@@ -128,7 +133,8 @@ class DiscoveryTasks:
             - Include timing and serving information
             """,
             expected_output=f"List of up to {max_results} recipes with complete details from web search",
-            async_execution=False
+            async_execution=False,
+            context=[]  # Explicitly set context to empty list to prevent _NotSpecified error
         )
         
         # Assign agent if provided

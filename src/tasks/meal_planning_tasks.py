@@ -47,7 +47,8 @@ class MealPlanningTasks:
             across multiple recipes to minimize waste.
             """,
             expected_output="Complete meal plan with recipes assigned to each meal, nutritional summary, and cost estimate",
-            async_execution=False
+            async_execution=False,
+            context=[]
         )
     
     def rank_recipe_suggestions_task(self) -> Task:
@@ -73,5 +74,6 @@ class MealPlanningTasks:
             Consider how recipes work together as a cohesive meal plan.
             """,
             expected_output="Ranked list of recipe suggestions with scores and explanations",
-            async_execution=False
+            async_execution=False,
+            context=[]
         ) 

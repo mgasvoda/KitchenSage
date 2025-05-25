@@ -34,7 +34,8 @@ class RecipeTasks:
             Store the recipe in the database and return the assigned recipe ID.
             """,
             expected_output="Recipe ID and confirmation of successful storage",
-            async_execution=False
+            async_execution=False,
+            context=[]  # Explicitly set context to empty list to prevent _NotSpecified error
         )
     
     def validate_and_store_recipes_task(self) -> Task:
@@ -58,7 +59,8 @@ class RecipeTasks:
             Return a summary of recipes processed, stored, and any validation issues.
             """,
             expected_output="Summary of validated and stored recipes with any issues noted",
-            async_execution=False
+            async_execution=False,
+            context=[]  # Explicitly set context to empty list to prevent _NotSpecified error
         )
     
     def fetch_recipes_for_plan_task(self) -> Task:
@@ -82,7 +84,8 @@ class RecipeTasks:
             Return a curated list of recipes suitable for the meal plan.
             """,
             expected_output="List of recipes with nutritional information and suitability scores",
-            async_execution=False
+            async_execution=False,
+            context=[]  # Explicitly set context to empty list to prevent _NotSpecified error
         )
     
     def find_recipes_by_ingredients_task(self, available_ingredients: List[str]) -> Task:
@@ -109,7 +112,8 @@ class RecipeTasks:
             Return ranked list of suitable recipes with ingredient match analysis.
             """,
             expected_output="Ranked list of recipes with ingredient match percentages and analysis",
-            async_execution=False
+            async_execution=False,
+            context=[]  # Explicitly set context to empty list to prevent _NotSpecified error
         )
     
     def search_stored_recipes_task(self,
@@ -129,6 +133,10 @@ class RecipeTasks:
         Returns:
             CrewAI Task object
         """
+        # Safely handle None values and convert to proper types
+        dietary_restrictions = dietary_restrictions or []
+        ingredients = ingredients or []
+        
         restrictions_text = ", ".join(dietary_restrictions) if dietary_restrictions else "None"
         ingredients_text = ", ".join(ingredients) if ingredients else "Any"
         
@@ -151,5 +159,6 @@ class RecipeTasks:
             nutritional data, and preparation time.
             """,
             expected_output="List of matching recipes from database with detailed information and relevance scores",
-            async_execution=False
+            async_execution=False,
+            context=[]  # Explicitly set context to empty list to prevent _NotSpecified error
         ) 

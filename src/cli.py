@@ -299,6 +299,11 @@ class KitchenCrewCLI:
     
     def start_chat(self):
         """Start the interactive chat session."""
+        # Show telemetry status
+        from src.utils.telemetry import is_tracing_enabled
+        
+        tracing_status = "🔭 Phoenix tracing: " + ("✅ Active" if is_tracing_enabled() else "❌ Disabled")
+        
         self.console.print(Panel.fit(
             "[bold blue]🍳 Welcome to KitchenCrew AI Assistant! 🍳[/bold blue]\n\n"
             "I'm your AI-powered cooking companion. You can ask me to:\n"
@@ -307,7 +312,8 @@ class KitchenCrewCLI:
             "• Generate grocery lists: 'make a shopping list for my meal plan'\n"
             "• Get suggestions: 'what can I make with chicken and rice?'\n"
             "• Add recipes: 'save this new pasta recipe'\n\n"
-            "Type 'help' for more examples or 'quit' to exit.",
+            f"{tracing_status}\n\n"
+            "Type 'help' for more examples, 'telemetry' for tracing info, or 'quit' to exit.",
             title="KitchenCrew Chat",
             border_style="blue"
         ))
@@ -327,6 +333,10 @@ class KitchenCrewCLI:
                 
                 if user_input.lower() == 'history':
                     self._show_history()
+                    continue
+                
+                if user_input.lower() == 'telemetry':
+                    self._show_telemetry_status()
                     continue
                 
                 # Process the command
@@ -381,34 +391,34 @@ class KitchenCrewCLI:
         """Execute the parsed command using the appropriate CrewAI agents."""
         try:
             if command_type == 'find_recipes':
-                # Filter parameters to only include those accepted by find_recipes
+                # Filter parameters to only include those accepted by find_recipes and remove None values
                 valid_params = {
                     k: v for k, v in parameters.items() 
-                    if k in ['cuisine', 'dietary_restrictions', 'ingredients', 'max_prep_time', 'original_query']
+                    if k in ['cuisine', 'dietary_restrictions', 'ingredients', 'max_prep_time', 'original_query'] and v is not None
                 }
                 return self.crew.find_recipes(**valid_params)
             
             elif command_type == 'search_stored_recipes':
-                # Filter parameters for search_stored_recipes
+                # Filter parameters for search_stored_recipes and remove None values
                 valid_params = {
                     k: v for k, v in parameters.items() 
-                    if k in ['cuisine', 'dietary_restrictions', 'ingredients', 'max_prep_time']
+                    if k in ['cuisine', 'dietary_restrictions', 'ingredients', 'max_prep_time'] and v is not None
                 }
                 return self.crew.search_stored_recipes(**valid_params)
             
             elif command_type == 'discover_new_recipes':
-                # Filter parameters for discover_new_recipes
+                # Filter parameters for discover_new_recipes and remove None values
                 valid_params = {
                     k: v for k, v in parameters.items() 
-                    if k in ['cuisine', 'dietary_restrictions', 'ingredients', 'max_prep_time', 'original_query']
+                    if k in ['cuisine', 'dietary_restrictions', 'ingredients', 'max_prep_time', 'original_query'] and v is not None
                 }
                 return self.crew.discover_new_recipes(**valid_params)
             
             elif command_type == 'create_meal_plan':
-                # Filter parameters for create_meal_plan
+                # Filter parameters for create_meal_plan and remove None values
                 valid_params = {
                     k: v for k, v in parameters.items() 
-                    if k in ['days', 'people', 'dietary_restrictions', 'budget']
+                    if k in ['days', 'people', 'dietary_restrictions', 'budget'] and v is not None
                 }
                 return self.crew.create_meal_plan(**valid_params)
             
@@ -569,6 +579,35 @@ class KitchenCrewCLI:
         
         self.console.print(table)
 
+    def _show_telemetry_status(self):
+        """Show Phoenix telemetry configuration status."""
+        from src.utils.telemetry import get_tracing_info, is_tracing_enabled
+        
+        console = Console()
+        tracing_info = get_tracing_info()
+        
+        # Create status table
+        table = Table(title="🔭 Phoenix Telemetry Status")
+        table.add_column("Setting", style="cyan")
+        table.add_column("Value", style="green" if tracing_info["enabled"] else "red")
+        
+        table.add_row("Tracing Enabled", "✅ Yes" if tracing_info["enabled"] else "❌ No")
+        table.add_row("API Key Configured", "✅ Yes" if tracing_info["api_key_configured"] else "❌ No")
+        table.add_row("Project Name", tracing_info["project_name"])
+        table.add_row("Endpoint", tracing_info["endpoint"])
+        
+        console.print(table)
+        
+        if tracing_info["enabled"]:
+            console.print("\n[green]✅ Phoenix tracing is active! Your CrewAI interactions will be traced.[/green]")
+            console.print("[blue]📊 View your traces at: https://app.phoenix.arize.com[/blue]")
+        else:
+            console.print("\n[yellow]⚠️  Phoenix tracing is not enabled.[/yellow]")
+            console.print("[blue]💡 To enable tracing:[/blue]")
+            console.print("   1. Set your PHOENIX_API_KEY in the .env file")
+            console.print("   2. Restart the application")
+            console.print("   3. Get your API key from: https://app.phoenix.arize.com")
+
 
 @click.group()
 def cli():
@@ -589,6 +628,37 @@ def ask(command):
     """Ask a single question to KitchenCrew AI agents."""
     kitchen_cli = KitchenCrewCLI()
     kitchen_cli._process_command(command)
+
+
+@cli.command()
+def telemetry():
+    """Show Phoenix telemetry configuration status."""
+    from src.utils.telemetry import get_tracing_info, is_tracing_enabled
+    
+    console = Console()
+    tracing_info = get_tracing_info()
+    
+    # Create status table
+    table = Table(title="🔭 Phoenix Telemetry Status")
+    table.add_column("Setting", style="cyan")
+    table.add_column("Value", style="green" if tracing_info["enabled"] else "red")
+    
+    table.add_row("Tracing Enabled", "✅ Yes" if tracing_info["enabled"] else "❌ No")
+    table.add_row("API Key Configured", "✅ Yes" if tracing_info["api_key_configured"] else "❌ No")
+    table.add_row("Project Name", tracing_info["project_name"])
+    table.add_row("Endpoint", tracing_info["endpoint"])
+    
+    console.print(table)
+    
+    if tracing_info["enabled"]:
+        console.print("\n[green]✅ Phoenix tracing is active! Your CrewAI interactions will be traced.[/green]")
+        console.print("[blue]📊 View your traces at: https://app.phoenix.arize.com[/blue]")
+    else:
+        console.print("\n[yellow]⚠️  Phoenix tracing is not enabled.[/yellow]")
+        console.print("[blue]💡 To enable tracing:[/blue]")
+        console.print("   1. Set your PHOENIX_API_KEY in the .env file")
+        console.print("   2. Restart the application")
+        console.print("   3. Get your API key from: https://app.phoenix.arize.com")
 
 
 if __name__ == "__main__":

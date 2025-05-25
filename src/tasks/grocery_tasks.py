@@ -33,7 +33,8 @@ class GroceryTasks:
             Return a comprehensive list of ingredients with quantities needed for shopping.
             """,
             expected_output="Consolidated list of ingredients with quantities, units, and categories",
-            async_execution=False
+            async_execution=False,
+            context=[]  # Explicitly set context to empty list to prevent _NotSpecified error
         )
     
     def optimize_grocery_list_task(self) -> Task:
@@ -58,5 +59,6 @@ class GroceryTasks:
             Return an optimized grocery list with cost estimates and shopping strategy.
             """,
             expected_output="Optimized grocery list organized by store sections with cost estimates and shopping tips",
-            async_execution=False
+            async_execution=False,
+            context=[]  # Explicitly set context to empty list to prevent _NotSpecified error
         ) 
