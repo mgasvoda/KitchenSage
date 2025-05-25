@@ -4,232 +4,396 @@ Web tools for recipe discovery and external data sources.
 
 import json
 import re
+import os
 from crewai.tools import BaseTool
 from typing import Dict, List, Any, Optional
+from openai import OpenAI
+from datetime import datetime
 
 
 class WebSearchTool(BaseTool):
-    """Tool for searching the web for recipes using MCP web search."""
+    """Tool for searching the web for recipes using OpenAI's web search capability."""
     
     name: str = "Web Search Tool"
-    description: str = "Searches the web for recipes using various search engines and recipe sites."
+    description: str = "Searches the web for recipes using OpenAI's web search functionality."
     
     def _run(self, query: str, max_results: int = 10) -> List[Dict[str, Any]]:
         """
-        Search the web for recipes.
+        Search the web for recipes using OpenAI's web search.
         
         Args:
             query: Search query for recipes
             max_results: Maximum number of results to return
             
         Returns:
-            List of recipe search results
+            List of recipe search results with URLs for scraping
         """
         try:
-            # For now, return structured placeholder data that simulates web search results
-            # In a real implementation, this would use MCP web search
+            # Initialize OpenAI client
+            client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
             
-            # Extract key terms from query for better simulation
-            vegetable_terms = ['vegetable', 'veggie', 'vegetables', 'greens', 'salad']
-            quick_terms = ['quick', 'fast', 'easy', 'simple', '30 minutes', 'light']
+            # Enhance the prompt to ensure we get recipe results with URLs
+            enhanced_prompt = f"""
+            Search for {query} recipes and provide detailed recipe information. 
             
-            is_vegetable_heavy = any(term in query.lower() for term in vegetable_terms)
-            is_quick = any(term in query.lower() for term in quick_terms)
+            IMPORTANT: Return ONLY a valid JSON array of recipe objects. Do not include any explanatory text before or after the JSON.
             
-            recipes = []
+            For each recipe found, include these exact fields:
+            - "name": Recipe name as a string
+            - "source": Source website domain (e.g., "allrecipes.com")
+            - "url": Complete URL to the recipe page
+            - "ingredients": Array of ingredient strings
+            - "instructions": Array of instruction strings
+            - "prep_time": Prep time in minutes (number)
+            - "cook_time": Cook time in minutes (number)
+            - "total_time": Total time in minutes (number)
+            - "servings": Number of servings (number)
+            - "difficulty": Difficulty level ("Easy", "Medium", or "Hard")
+            - "tags": Array of dietary/cuisine tags
+            - "nutrition": Object with calories, protein, carbs, fat if available
             
-            if is_vegetable_heavy and is_quick:
-                recipes = [
+            Example format:
+            [
+              {{
+                "name": "Quick Vegetarian Pasta",
+                "source": "allrecipes.com",
+                "url": "https://allrecipes.com/recipe/quick-vegetarian-pasta",
+                "ingredients": ["1 lb pasta", "2 cups vegetables"],
+                "instructions": ["Cook pasta", "Add vegetables"],
+                "prep_time": 10,
+                "cook_time": 15,
+                "total_time": 25,
+                "servings": 4,
+                "difficulty": "Easy",
+                "tags": ["vegetarian", "quick"],
+                "nutrition": {{"calories": 300, "protein": 12, "carbs": 45, "fat": 8}}
+              }}
+            ]
+            
+            Limit to {max_results} recipes maximum.
+            """
+            
+            # Use OpenAI's responses API with web search
+            response = client.responses.create(
+                model="gpt-4o-mini",  # Using gpt-4o-mini as specified
+                input=enhanced_prompt,
+                tools=[
                     {
-                        "name": "Mediterranean Vegetable Stir-Fry",
-                        "source": "allrecipes.com",
-                        "url": "https://allrecipes.com/recipe/mediterranean-veggie-stir-fry",
-                        "prep_time": 20,
-                        "cook_time": 15,
-                        "total_time": 35,
-                        "servings": 4,
-                        "difficulty": "Easy",
-                        "rating": 4.5,
-                        "ingredients": [
-                            "2 zucchini, sliced",
-                            "1 bell pepper, chopped",
-                            "1 eggplant, cubed",
-                            "2 tomatoes, diced",
-                            "3 cloves garlic, minced",
-                            "2 tbsp olive oil",
-                            "1 tsp oregano",
-                            "Salt and pepper to taste"
-                        ],
-                        "instructions": [
-                            "Heat olive oil in large pan over medium-high heat",
-                            "Add garlic and cook for 1 minute",
-                            "Add eggplant and cook for 5 minutes",
-                            "Add zucchini and bell pepper, cook 5 minutes",
-                            "Add tomatoes and seasonings, cook 3-5 minutes until tender",
-                            "Serve immediately"
-                        ],
-                        "tags": ["vegetarian", "mediterranean", "quick", "healthy", "light"],
-                        "nutrition": {
-                            "calories": 120,
-                            "protein": 4,
-                            "carbs": 15,
-                            "fat": 7,
-                            "fiber": 6
-                        }
-                    },
-                    {
-                        "name": "Asian Vegetable Lettuce Wraps",
-                        "source": "foodnetwork.com",
-                        "url": "https://foodnetwork.com/recipes/asian-veggie-wraps",
-                        "prep_time": 15,
-                        "cook_time": 10,
-                        "total_time": 25,
-                        "servings": 4,
-                        "difficulty": "Easy",
-                        "rating": 4.7,
-                        "ingredients": [
-                            "1 head butter lettuce",
-                            "2 carrots, julienned",
-                            "1 cucumber, julienned",
-                            "1 red bell pepper, sliced thin",
-                            "1 cup snap peas",
-                            "2 green onions, sliced",
-                            "1/4 cup peanuts, chopped",
-                            "2 tbsp sesame oil",
-                            "2 tbsp rice vinegar",
-                            "1 tbsp soy sauce",
-                            "1 tsp ginger, grated"
-                        ],
-                        "instructions": [
-                            "Wash and separate lettuce leaves",
-                            "Prepare all vegetables by cutting into thin strips",
-                            "Whisk together sesame oil, rice vinegar, soy sauce, and ginger",
-                            "Toss vegetables with dressing",
-                            "Fill lettuce cups with vegetable mixture",
-                            "Top with chopped peanuts and serve"
-                        ],
-                        "tags": ["vegetarian", "asian", "raw", "healthy", "light", "no-cook"],
-                        "nutrition": {
-                            "calories": 95,
-                            "protein": 3,
-                            "carbs": 8,
-                            "fat": 6,
-                            "fiber": 4
-                        }
-                    },
-                    {
-                        "name": "Roasted Vegetable Quinoa Bowl",
-                        "source": "minimalistbaker.com",
-                        "url": "https://minimalistbaker.com/roasted-veggie-quinoa-bowl",
-                        "prep_time": 10,
-                        "cook_time": 25,
-                        "total_time": 35,
-                        "servings": 3,
-                        "difficulty": "Easy",
-                        "rating": 4.6,
-                        "ingredients": [
-                            "1 cup quinoa",
-                            "2 cups broccoli florets",
-                            "1 sweet potato, cubed",
-                            "1 red onion, sliced",
-                            "2 tbsp olive oil",
-                            "1 tsp cumin",
-                            "1/2 tsp paprika",
-                            "Salt and pepper",
-                            "2 tbsp tahini",
-                            "1 lemon, juiced",
-                            "1 clove garlic, minced"
-                        ],
-                        "instructions": [
-                            "Preheat oven to 425°F",
-                            "Cook quinoa according to package directions",
-                            "Toss vegetables with olive oil and spices",
-                            "Roast vegetables for 20-25 minutes",
-                            "Mix tahini, lemon juice, and garlic for dressing",
-                            "Serve roasted vegetables over quinoa with dressing"
-                        ],
-                        "tags": ["vegetarian", "vegan", "healthy", "roasted", "quinoa"],
-                        "nutrition": {
-                            "calories": 285,
-                            "protein": 9,
-                            "carbs": 45,
-                            "fat": 9,
-                            "fiber": 7
-                        }
+                        "type": "web_search_preview"
                     }
                 ]
-            else:
-                # Generic quick recipes
-                recipes = [
-                    {
-                        "name": "Quick Pasta Primavera",
-                        "source": "bonappetit.com",
-                        "url": "https://bonappetit.com/recipe/quick-pasta-primavera",
-                        "prep_time": 15,
-                        "cook_time": 15,
-                        "total_time": 30,
-                        "servings": 4,
-                        "difficulty": "Easy",
-                        "rating": 4.3,
-                        "ingredients": [
-                            "12 oz pasta",
-                            "2 cups mixed vegetables",
-                            "3 cloves garlic",
-                            "1/4 cup olive oil",
-                            "1/2 cup parmesan cheese"
-                        ],
-                        "instructions": [
-                            "Cook pasta according to package directions",
-                            "Sauté vegetables with garlic in olive oil",
-                            "Toss with pasta and cheese"
-                        ],
-                        "tags": ["vegetarian", "pasta", "quick"],
-                        "nutrition": {
-                            "calories": 320,
-                            "protein": 12,
-                            "carbs": 55,
-                            "fat": 8,
-                            "fiber": 4
-                        }
-                    }
-                ]
+            )
             
-            return recipes[:max_results]
+            # Extract the response content
+            if hasattr(response, 'output_text') and response.output_text:
+                content = response.output_text.strip()
+                
+                # Clean up the content to extract JSON
+                # Remove any text before the first [ and after the last ]
+                start_idx = content.find('[')
+                end_idx = content.rfind(']')
+                
+                if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+                    json_content = content[start_idx:end_idx + 1]
+                else:
+                    json_content = content
+                
+                # Try to parse JSON response
+                try:
+                    recipes = json.loads(json_content)
+                    if isinstance(recipes, list):
+                        # Ensure each recipe has required fields and a URL
+                        processed_recipes = []
+                        for recipe in recipes:
+                            if isinstance(recipe, dict):
+                                # Ensure URL is present for web scraping
+                                if 'url' not in recipe or not recipe['url']:
+                                    # Generate a placeholder URL based on source
+                                    source = recipe.get('source', 'unknown')
+                                    recipe_name = recipe.get('name', 'recipe').lower().replace(' ', '-').replace('&', 'and')
+                                    recipe['url'] = f"https://{source}/recipe/{recipe_name}"
+                                
+                                # Ensure required fields are present
+                                recipe.setdefault('name', 'Unknown Recipe')
+                                recipe.setdefault('ingredients', [])
+                                recipe.setdefault('instructions', [])
+                                recipe.setdefault('prep_time', 0)
+                                recipe.setdefault('cook_time', 0)
+                                recipe.setdefault('total_time', recipe.get('prep_time', 0) + recipe.get('cook_time', 0))
+                                recipe.setdefault('servings', 4)
+                                recipe.setdefault('difficulty', 'Medium')
+                                recipe.setdefault('tags', [])
+                                recipe.setdefault('source', 'web_search')
+                                
+                                processed_recipes.append(recipe)
+                        
+                        return processed_recipes[:max_results]
+                    
+                except json.JSONDecodeError as e:
+                    # If JSON parsing fails, try to extract recipe information from text
+                    return self._parse_text_response(content, max_results)
+            
+            # Fallback if no valid response
+            return [{"error": "No recipes found", "message": "Web search completed but no recipes were returned"}]
             
         except Exception as e:
-            return [{"error": f"Web search failed: {str(e)}"}]
+            return [{"error": f"Web search failed: {str(e)}", "message": "Please check your OpenAI API key and internet connection"}]
+    
+    def _parse_text_response(self, content: str, max_results: int) -> List[Dict[str, Any]]:
+        """
+        Parse text response when JSON parsing fails.
+        
+        Args:
+            content: Text content from OpenAI response
+            max_results: Maximum number of results to return
+            
+        Returns:
+            List of parsed recipe dictionaries
+        """
+        recipes = []
+        
+        # Simple text parsing - look for recipe-like patterns
+        lines = content.split('\n')
+        current_recipe = {}
+        
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+                
+            # Look for recipe names (often in titles or bold)
+            if any(keyword in line.lower() for keyword in ['recipe', 'dish', 'meal']):
+                if current_recipe and 'name' in current_recipe:
+                    recipes.append(current_recipe)
+                    current_recipe = {}
+                
+                current_recipe['name'] = line.replace('*', '').replace('#', '').strip()
+                current_recipe['source'] = 'web_search'
+                current_recipe['url'] = f"https://example.com/recipe/{current_recipe['name'].lower().replace(' ', '-')}"
+                current_recipe['ingredients'] = []
+                current_recipe['instructions'] = []
+                current_recipe['prep_time'] = 30
+                current_recipe['cook_time'] = 30
+                current_recipe['total_time'] = 60
+                current_recipe['servings'] = 4
+                current_recipe['difficulty'] = 'Medium'
+                current_recipe['tags'] = []
+        
+        if current_recipe and 'name' in current_recipe:
+            recipes.append(current_recipe)
+        
+        return recipes[:max_results]
 
 
 class WebScrapingTool(BaseTool):
-    """Tool for scraping recipes from cooking websites."""
+    """Tool for scraping recipes from cooking websites using OpenAI for content extraction."""
     
     name: str = "Web Scraping Tool"
-    description: str = "Scrapes recipes from cooking websites and food blogs."
+    description: str = "Scrapes recipes from cooking websites and extracts structured recipe data using AI."
     
     def _run(self, url: str, search_terms: Optional[str] = None) -> List[Dict[str, Any]]:
         """
-        Scrape recipes from a website.
+        Scrape recipes from a website using OpenAI for content extraction.
         
         Args:
             url: Website URL to scrape
             search_terms: Optional search terms to filter results
             
         Returns:
-            List of scraped recipes
+            List of scraped recipes with structured data
         """
-        # Enhanced placeholder implementation with better structure
-        return [
-            {
-                "name": "Scraped Recipe from " + url.split('//')[-1].split('/')[0],
+        try:
+            # Initialize OpenAI client
+            client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+            
+            # Create a prompt for OpenAI to scrape and extract recipe data
+            scraping_prompt = f"""
+            Please scrape the recipe content from this URL: {url}
+            
+            IMPORTANT: Return ONLY a valid JSON object with the recipe information. Do not include any explanatory text.
+            
+            Extract and format as JSON with these exact fields:
+            - "name": Recipe name as a string
+            - "ingredients": Array of ingredient strings with quantities
+            - "instructions": Array of step-by-step instruction strings
+            - "prep_time": Prep time in minutes (number)
+            - "cook_time": Cook time in minutes (number)
+            - "total_time": Total time in minutes (number)
+            - "servings": Number of servings (number)
+            - "difficulty": Difficulty level ("Easy", "Medium", or "Hard")
+            - "tags": Array of dietary/cuisine tags
+            - "nutrition": Object with nutritional info if available
+            - "description": Brief recipe description
+            - "tips": Array of cooking tips if available
+            
+            If search terms are provided: {search_terms or 'None'}, prioritize content matching these terms.
+            
+            Example format:
+            {{
+              "name": "Recipe Name",
+              "ingredients": ["1 cup flour", "2 eggs"],
+              "instructions": ["Mix ingredients", "Bake for 30 minutes"],
+              "prep_time": 15,
+              "cook_time": 30,
+              "total_time": 45,
+              "servings": 4,
+              "difficulty": "Easy",
+              "tags": ["vegetarian", "baking"],
+              "nutrition": {{"calories": 250, "protein": 8}},
+              "description": "A delicious recipe",
+              "tips": ["Tip 1", "Tip 2"]
+            }}
+            """
+            
+            # Use OpenAI's responses API with web search to access the URL
+            response = client.responses.create(
+                model="gpt-4o-mini",
+                input=scraping_prompt,
+                tools=[
+                    {
+                        "type": "web_search_preview"
+                    }
+                ]
+            )
+            
+            # Extract and process the response
+            if hasattr(response, 'output_text') and response.output_text:
+                content = response.output_text.strip()
+                
+                # Clean up the content to extract JSON
+                # Look for JSON object or array
+                start_idx = max(content.find('{'), content.find('['))
+                if content.find('{') != -1 and content.find('[') != -1:
+                    start_idx = min(content.find('{'), content.find('['))
+                elif content.find('{') != -1:
+                    start_idx = content.find('{')
+                    end_idx = content.rfind('}')
+                else:
+                    start_idx = content.find('[')
+                    end_idx = content.rfind(']')
+                
+                if start_idx != -1:
+                    if content[start_idx] == '{':
+                        end_idx = content.rfind('}')
+                    else:
+                        end_idx = content.rfind(']')
+                    
+                    if end_idx != -1 and end_idx > start_idx:
+                        json_content = content[start_idx:end_idx + 1]
+                    else:
+                        json_content = content
+                else:
+                    json_content = content
+                
+                try:
+                    # Try to parse as JSON
+                    scraped_data = json.loads(json_content)
+                    
+                    # Ensure we have a list of recipes
+                    if isinstance(scraped_data, dict):
+                        scraped_data = [scraped_data]
+                    
+                    processed_recipes = []
+                    for recipe in scraped_data:
+                        if isinstance(recipe, dict):
+                            # Ensure required fields and add metadata
+                            recipe.setdefault('name', f"Recipe from {url.split('//')[-1].split('/')[0]}")
+                            recipe.setdefault('source', url)
+                            recipe.setdefault('url', url)
+                            recipe.setdefault('ingredients', [])
+                            recipe.setdefault('instructions', [])
+                            recipe.setdefault('prep_time', 0)
+                            recipe.setdefault('cook_time', 0)
+                            recipe.setdefault('total_time', recipe.get('prep_time', 0) + recipe.get('cook_time', 0))
+                            recipe.setdefault('servings', 4)
+                            recipe.setdefault('difficulty', 'Medium')
+                            recipe.setdefault('tags', [])
+                            recipe['scraped_at'] = json.dumps({"timestamp": str(datetime.now())})
+                            recipe['message'] = "Recipe successfully scraped and extracted"
+                            
+                            processed_recipes.append(recipe)
+                    
+                    return processed_recipes
+                    
+                except json.JSONDecodeError as e:
+                    # If JSON parsing fails, create a structured response from text
+                    return self._parse_scraped_text(content, url)
+            
+            # Fallback response
+            return [{
+                "name": f"Recipe from {url.split('//')[-1].split('/')[0]}",
                 "source": url,
-                "ingredients": ["2 cups fresh vegetables", "1 tbsp olive oil", "Salt and pepper"],
-                "instructions": ["Prepare vegetables", "Cook with oil", "Season to taste"],
-                "prep_time": 15,
-                "cook_time": 20,
+                "url": url,
+                "ingredients": ["Unable to extract ingredients"],
+                "instructions": ["Unable to extract instructions"],
+                "prep_time": 0,
+                "cook_time": 0,
                 "servings": 4,
-                "message": "Web scraping completed successfully"
-            }
-        ]
+                "message": "Web scraping completed but content extraction was limited",
+                "error": "Could not fully parse recipe content"
+            }]
+            
+        except Exception as e:
+            return [{
+                "error": f"Web scraping failed: {str(e)}",
+                "url": url,
+                "message": "Please check the URL and your internet connection"
+            }]
+    
+    def _parse_scraped_text(self, content: str, url: str) -> List[Dict[str, Any]]:
+        """
+        Parse scraped text content when JSON parsing fails.
+        
+        Args:
+            content: Text content from scraping
+            url: Source URL
+            
+        Returns:
+            List of parsed recipe dictionaries
+        """
+        # Basic text parsing for recipe information
+        lines = [line.strip() for line in content.split('\n') if line.strip()]
+        
+        recipe = {
+            "name": f"Recipe from {url.split('//')[-1].split('/')[0]}",
+            "source": url,
+            "url": url,
+            "ingredients": [],
+            "instructions": [],
+            "prep_time": 30,
+            "cook_time": 30,
+            "total_time": 60,
+            "servings": 4,
+            "difficulty": "Medium",
+            "tags": [],
+            "scraped_at": json.dumps({"timestamp": str(datetime.now())}),
+            "message": "Recipe scraped with basic text parsing"
+        }
+        
+        # Try to extract recipe name from first few lines
+        for line in lines[:5]:
+            if len(line) > 10 and len(line) < 100:
+                recipe["name"] = line
+                break
+        
+        # Look for ingredients and instructions in the content
+        current_section = None
+        for line in lines:
+            line_lower = line.lower()
+            
+            if any(word in line_lower for word in ['ingredient', 'what you need', 'you will need']):
+                current_section = 'ingredients'
+                continue
+            elif any(word in line_lower for word in ['instruction', 'method', 'directions', 'steps', 'how to']):
+                current_section = 'instructions'
+                continue
+            
+            if current_section == 'ingredients' and line and not line.startswith('#'):
+                recipe["ingredients"].append(line)
+            elif current_section == 'instructions' and line and not line.startswith('#'):
+                recipe["instructions"].append(line)
+        
+        return [recipe]
 
 
 class RecipeAPITool(BaseTool):
