@@ -4,8 +4,7 @@ Recipe Scout Agent - Discovers and retrieves recipes from external sources.
 
 import os
 from crewai import Agent
-from src.tools.web_tools import WebScrapingTool, RecipeAPITool, ContentFilterTool
-from src.tools.database_tools import DatabaseTool, RecipeValidatorTool
+from src.tools.web_tools import WebSearchTool, WebScrapingTool, RecipeAPITool, ContentFilterTool
 
 
 class RecipeScoutAgent:
@@ -22,11 +21,10 @@ class RecipeScoutAgent:
     def __init__(self):
         """Initialize the Recipe Scout agent with necessary tools."""
         self.tools = [
+            WebSearchTool(),
             WebScrapingTool(),
             RecipeAPITool(),
-            ContentFilterTool(),
-            DatabaseTool(),
-            RecipeValidatorTool()
+            ContentFilterTool()
         ]
         
         # Check if OpenAI API key is available
@@ -40,13 +38,14 @@ class RecipeScoutAgent:
         
         self.agent = Agent(
             role="Culinary Researcher and Recipe Discovery Specialist",
-            goal="Find and retrieve relevant recipes from various external sources",
+            goal="Find and retrieve relevant recipes from various external sources including web search, APIs, and cooking websites",
             backstory="""You are a culinary researcher with access to global recipe 
             databases, cooking websites, and food blogs. You have an eye for quality 
             recipes and can quickly identify reliable sources. Your expertise includes 
             understanding different cuisine traditions, seasonal ingredients, and trending 
             food movements. You excel at finding recipes that match specific criteria 
-            while ensuring they come from trustworthy sources.""",
+            while ensuring they come from trustworthy sources. You use web search tools 
+            to discover the latest and most popular recipes online.""",
             tools=self.tools,
             verbose=True,
             allow_delegation=False,

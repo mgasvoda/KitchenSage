@@ -5,7 +5,6 @@ Recipe Manager Agent - Handles database operations and recipe management.
 import os
 from crewai import Agent
 from typing import List, Optional
-from src.tools.database_tools import DatabaseTool, RecipeValidatorTool, RecipeSearchTool
 
 
 class RecipeManagerAgent:
@@ -21,11 +20,8 @@ class RecipeManagerAgent:
     
     def __init__(self):
         """Initialize the Recipe Manager agent with necessary tools."""
-        self.tools = [
-            DatabaseTool(),
-            RecipeValidatorTool(),
-            RecipeSearchTool()
-        ]
+        # Simplified version without database tools for now
+        self.tools = []
         
         # Check if OpenAI API key is available
         api_key = os.getenv('OPENAI_API_KEY')

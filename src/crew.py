@@ -64,18 +64,23 @@ class KitchenCrew:
         self.logger.info(f"Finding recipes with criteria: cuisine={cuisine}, "
                         f"dietary_restrictions={dietary_restrictions}")
         
+        # Create the search task with proper agent assignment
+        search_task = self.discovery_tasks.search_recipes_task(
+            cuisine=cuisine,
+            dietary_restrictions=dietary_restrictions,
+            ingredients=ingredients,
+            max_prep_time=max_prep_time,
+            agent=self.recipe_scout.agent
+        )
+        
+        # Create the validation task with proper agent assignment
+        validation_task = self.recipe_tasks.validate_and_store_recipes_task()
+        validation_task.agent = self.recipe_manager.agent
+        
         # Create discovery crew
         discovery_crew = Crew(
             agents=[self.recipe_scout.agent, self.recipe_manager.agent],
-            tasks=[
-                self.discovery_tasks.search_recipes_task(
-                    cuisine=cuisine,
-                    dietary_restrictions=dietary_restrictions,
-                    ingredients=ingredients,
-                    max_prep_time=max_prep_time
-                ),
-                self.recipe_tasks.validate_and_store_recipes_task()
-            ],
+            tasks=[search_task, validation_task],
             process=Process.sequential,
             verbose=True
         )
@@ -196,4 +201,86 @@ class KitchenCrew:
         )
         
         result = suggestion_crew.kickoff()
+        return result
+    
+    def search_stored_recipes(self, 
+                             cuisine: Optional[str] = None,
+                             dietary_restrictions: Optional[List[str]] = None,
+                             ingredients: Optional[List[str]] = None,
+                             max_prep_time: Optional[int] = None) -> Dict[str, Any]:
+        """
+        Search recipes that are already stored in the database.
+        
+        Args:
+            cuisine: Type of cuisine (e.g., "italian", "mexican")
+            dietary_restrictions: List of dietary restrictions
+            ingredients: Available ingredients to use
+            max_prep_time: Maximum preparation time in minutes
+            
+        Returns:
+            Dictionary containing found recipes from database
+        """
+        self.logger.info(f"Searching stored recipes with criteria: cuisine={cuisine}, "
+                        f"dietary_restrictions={dietary_restrictions}")
+        
+        # Create database search crew (only recipe manager, no scout)
+        search_crew = Crew(
+            agents=[self.recipe_manager.agent],
+            tasks=[
+                self.recipe_tasks.search_stored_recipes_task(
+                    cuisine=cuisine,
+                    dietary_restrictions=dietary_restrictions,
+                    ingredients=ingredients,
+                    max_prep_time=max_prep_time
+                )
+            ],
+            process=Process.sequential,
+            verbose=True
+        )
+        
+        result = search_crew.kickoff()
+        return result
+    
+    def discover_new_recipes(self, 
+                            cuisine: Optional[str] = None,
+                            dietary_restrictions: Optional[List[str]] = None,
+                            ingredients: Optional[List[str]] = None,
+                            max_prep_time: Optional[int] = None) -> Dict[str, Any]:
+        """
+        Discover new recipes from external sources and optionally store them.
+        
+        Args:
+            cuisine: Type of cuisine (e.g., "italian", "mexican")
+            dietary_restrictions: List of dietary restrictions
+            ingredients: Available ingredients to use
+            max_prep_time: Maximum preparation time in minutes
+            
+        Returns:
+            Dictionary containing newly discovered recipes
+        """
+        self.logger.info(f"Discovering new recipes with criteria: cuisine={cuisine}, "
+                        f"dietary_restrictions={dietary_restrictions}")
+        
+        # Create the search task with proper agent assignment
+        search_task = self.discovery_tasks.search_recipes_task(
+            cuisine=cuisine,
+            dietary_restrictions=dietary_restrictions,
+            ingredients=ingredients,
+            max_prep_time=max_prep_time,
+            agent=self.recipe_scout.agent
+        )
+        
+        # Create the validation task with proper agent assignment
+        validation_task = self.recipe_tasks.validate_and_store_recipes_task()
+        validation_task.agent = self.recipe_manager.agent
+        
+        # Create discovery crew (scout + manager for validation/storage)
+        discovery_crew = Crew(
+            agents=[self.recipe_scout.agent, self.recipe_manager.agent],
+            tasks=[search_task, validation_task],
+            process=Process.sequential,
+            verbose=True
+        )
+        
+        result = discovery_crew.kickoff()
         return result 

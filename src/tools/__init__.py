@@ -12,7 +12,7 @@ This module contains all the tools used by the KitchenCrew agents for:
 from .database_tools import DatabaseTool, RecipeValidatorTool, RecipeSearchTool
 from .meal_planning_tools import MealPlanningTool, NutritionAnalysisTool, CalendarTool
 from .grocery_tools import InventoryTool, PriceComparisonTool, ListOptimizationTool
-from .web_tools import WebScrapingTool, RecipeAPITool, ContentFilterTool
+from .web_tools import WebSearchTool, WebScrapingTool, RecipeAPITool, ContentFilterTool
 
 __all__ = [
     # Database and recipe tools
@@ -31,6 +31,7 @@ __all__ = [
     "ListOptimizationTool",
     
     # External integration tools
+    "WebSearchTool",
     "WebScrapingTool",
     "RecipeAPITool",
     "ContentFilterTool",
@@ -67,6 +68,7 @@ def get_grocery_tools():
 def get_web_tools():
     """Get all tools related to external data sources."""
     return [
+        WebSearchTool(),
         WebScrapingTool(),
         RecipeAPITool(),
         ContentFilterTool()
