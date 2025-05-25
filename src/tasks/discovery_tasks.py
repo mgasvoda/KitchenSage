@@ -14,6 +14,7 @@ class DiscoveryTasks:
                            dietary_restrictions: Optional[List[str]] = None,
                            ingredients: Optional[List[str]] = None,
                            max_prep_time: Optional[int] = None,
+                           original_query: Optional[str] = None,
                            agent=None) -> Task:
         """
         Task to search for recipes from external sources.
@@ -23,6 +24,7 @@ class DiscoveryTasks:
             dietary_restrictions: List of dietary restrictions
             ingredients: Available ingredients to use
             max_prep_time: Maximum preparation time in minutes
+            original_query: The original user query for context
             agent: The agent to assign this task to
             
         Returns:
@@ -50,12 +52,22 @@ class DiscoveryTasks:
         # Build search query for web search
         search_query = " ".join(search_query_parts + ["recipes"])
         if not search_query_parts:
-            search_query = "healthy dinner recipes"
+            # Use original user query if available, otherwise default
+            if original_query:
+                # Clean up the original query for search
+                search_query = original_query.strip()
+                if not search_query.endswith('recipe') and not search_query.endswith('recipes'):
+                    search_query += " recipes"
+            else:
+                search_query = "healthy dinner recipes"
         
         task = Task(
             description=f"""
             Search for recipes from external sources with the following criteria:
             {criteria_text}
+            
+            IMPORTANT: The user's original query was: "{original_query or 'Not provided'}"
+            Always prioritize the user's specific search terms and intent from their original query.
             
             Use the following approach:
             1. Start with a web search using query: "{search_query}"
@@ -69,10 +81,11 @@ class DiscoveryTasks:
             Focus on finding recipes that are:
             - Complete with ingredients and instructions
             - From reliable sources
-            - Match the specified criteria
+            - Match the specified criteria AND the user's original intent
+            - Feature the specific ingredients or dishes mentioned by the user
             - Have good ratings or reviews when available
             
-            Return a comprehensive list of recipes that match the search criteria.
+            Return a comprehensive list of recipes that match the search criteria and user's intent.
             """,
             expected_output="List of 5-10 recipes with complete information including ingredients, instructions, prep time, and source metadata",
             async_execution=False

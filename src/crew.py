@@ -48,7 +48,9 @@ class KitchenCrew:
                     cuisine: Optional[str] = None,
                     dietary_restrictions: Optional[List[str]] = None,
                     ingredients: Optional[List[str]] = None,
-                    max_prep_time: Optional[int] = None) -> Dict[str, Any]:
+                    max_prep_time: Optional[int] = None,
+                    original_query: Optional[str] = None,
+                    **kwargs) -> Dict[str, Any]:
         """
         Find recipes based on specified criteria.
         
@@ -57,6 +59,7 @@ class KitchenCrew:
             dietary_restrictions: List of dietary restrictions
             ingredients: Available ingredients to use
             max_prep_time: Maximum preparation time in minutes
+            original_query: Original user query for context
             
         Returns:
             Dictionary containing found recipes and metadata
@@ -70,6 +73,7 @@ class KitchenCrew:
             dietary_restrictions=dietary_restrictions,
             ingredients=ingredients,
             max_prep_time=max_prep_time,
+            original_query=original_query,
             agent=self.recipe_scout.agent
         )
         
@@ -264,7 +268,9 @@ class KitchenCrew:
                             cuisine: Optional[str] = None,
                             dietary_restrictions: Optional[List[str]] = None,
                             ingredients: Optional[List[str]] = None,
-                            max_prep_time: Optional[int] = None) -> Dict[str, Any]:
+                            max_prep_time: Optional[int] = None,
+                            original_query: Optional[str] = None,
+                            **kwargs) -> Dict[str, Any]:
         """
         Discover new recipes from external sources and optionally store them.
         
@@ -273,6 +279,7 @@ class KitchenCrew:
             dietary_restrictions: List of dietary restrictions
             ingredients: Available ingredients to use
             max_prep_time: Maximum preparation time in minutes
+            original_query: Original user query for context
             
         Returns:
             Dictionary containing newly discovered recipes
@@ -286,6 +293,7 @@ class KitchenCrew:
             dietary_restrictions=dietary_restrictions,
             ingredients=ingredients,
             max_prep_time=max_prep_time,
+            original_query=original_query,
             agent=self.recipe_scout.agent
         )
         

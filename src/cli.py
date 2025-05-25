@@ -203,6 +203,26 @@ class CommandParser:
             if ingredients:
                 params['ingredients'] = ingredients
         
+        # NEW: Extract recipe name/main ingredient from simple queries like "pork tenderloin recipe"
+        # This handles cases where users just say "[ingredient/dish] recipe"
+        if not ingredients_match and command_type in ['find_recipes', 'discover_new_recipes', 'search_stored_recipes']:
+            # Look for pattern: "[ingredient/dish name] recipe(s)"
+            recipe_name_match = re.search(r'^(.+?)\s+recipes?(?:\s|$)', user_input, re.IGNORECASE)
+            if recipe_name_match:
+                recipe_name = recipe_name_match.group(1).strip()
+                # Filter out command words
+                command_words = ['find', 'search', 'look', 'for', 'show', 'me', 'get', 'discover', 'new']
+                recipe_words = []
+                for word in recipe_name.split():
+                    if word.lower() not in command_words:
+                        recipe_words.append(word)
+                
+                if recipe_words:
+                    # If it looks like an ingredient or dish name, add it
+                    recipe_ingredient = ' '.join(recipe_words)
+                    params['ingredients'] = [recipe_ingredient]
+                    params['recipe_name'] = recipe_ingredient
+        
         # Extract vegetable preference
         vegetables_match = re.search(self.param_patterns['vegetables'], user_input, re.IGNORECASE)
         if vegetables_match:
@@ -252,6 +272,9 @@ class CommandParser:
         
         if search_terms:
             params['search_query'] = ' '.join(search_terms) + ' recipes'
+        
+        # NEW: Also capture the original user query for better context
+        params['original_query'] = user_input
         
         return params
 
@@ -361,7 +384,7 @@ class KitchenCrewCLI:
                 # Filter parameters to only include those accepted by find_recipes
                 valid_params = {
                     k: v for k, v in parameters.items() 
-                    if k in ['cuisine', 'dietary_restrictions', 'ingredients', 'max_prep_time']
+                    if k in ['cuisine', 'dietary_restrictions', 'ingredients', 'max_prep_time', 'original_query']
                 }
                 return self.crew.find_recipes(**valid_params)
             
@@ -377,7 +400,7 @@ class KitchenCrewCLI:
                 # Filter parameters for discover_new_recipes
                 valid_params = {
                     k: v for k, v in parameters.items() 
-                    if k in ['cuisine', 'dietary_restrictions', 'ingredients', 'max_prep_time']
+                    if k in ['cuisine', 'dietary_restrictions', 'ingredients', 'max_prep_time', 'original_query']
                 }
                 return self.crew.discover_new_recipes(**valid_params)
             
