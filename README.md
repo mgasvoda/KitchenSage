@@ -57,8 +57,9 @@ KitchenSage/
 - Python 3.10+
 - Node.js 18+
 - [uv](https://github.com/astral-sh/uv) (Python package manager)
+- OpenAI API key (required)
 
-### Environment Setup
+### Quick Start
 
 1. Clone the repository:
    ```bash
@@ -66,13 +67,60 @@ KitchenSage/
    cd KitchenSage
    ```
 
-2. Create environment file:
+2. Create and configure environment file:
    ```bash
    cp env_example.txt .env
-   # Edit .env and add your OpenAI API key
    ```
 
-### Running the Backend
+3. **Required:** Edit `.env` and add your OpenAI API key:
+   ```bash
+   OPENAI_API_KEY=your_actual_api_key_here
+   ```
+
+   This is the **only required** environment variable. The application will not function without a valid OpenAI API key.
+
+4. **Optional:** Configure additional settings in `.env`:
+   - `PHOENIX_API_KEY` - For Phoenix telemetry/tracing (optional)
+   - `LOG_LEVEL` - Logging level (defaults to INFO)
+   - `DATABASE_URL` - Database path (defaults to sqlite:///kitchen_crew.db)
+   - Other settings are pre-configured with sensible defaults
+
+5. Install dependencies and initialize database:
+   ```bash
+   # Backend dependencies
+   cd backend
+   uv sync
+   uv run python scripts/init_db.py
+   cd ..
+
+   # Frontend dependencies
+   cd frontend
+   npm install
+   cd ..
+   ```
+
+6. Start all services:
+   ```bash
+   ./start.sh
+   ```
+
+   This starts both the backend API (http://localhost:8000) and frontend (http://localhost:5173) in the background.
+
+7. Check status, view logs, or stop services:
+   ```bash
+   ./status.sh              # Check service status
+   ./logs.sh both           # View logs
+   ./logs.sh errors         # View only errors
+   ./stop.sh                # Stop all services
+   ```
+
+   See [SERVICES.md](SERVICES.md) for complete service management documentation.
+
+### Manual Setup (Alternative to Quick Start)
+
+If you prefer to run services manually instead of using the management scripts:
+
+#### Running the Backend
 
 ```bash
 cd backend
@@ -110,6 +158,18 @@ cd backend
 uv run python main.py chat
 ```
 
+### Importing Recipes from Paprika
+
+If you have recipes in the Paprika app, you can import them:
+
+```bash
+cd backend
+uv run python scripts/import_paprika.py ~/Downloads/Export*.paprikarecipes --dry-run
+uv run python scripts/import_paprika.py ~/Downloads/Export*.paprikarecipes
+```
+
+See [docs/paprika-import.md](docs/paprika-import.md) for detailed import documentation.
+
 ## Development
 
 ### Running Tests
@@ -118,9 +178,19 @@ uv run python main.py chat
 # Backend tests
 cd backend
 uv run pytest
+uv run pytest -v  # With verbose output
 
-# With verbose output
-uv run pytest -v
+# Frontend tests
+cd frontend
+npm run test:run      # Run all tests once
+npm run test          # Run tests in watch mode
+npm run test:coverage # Run with coverage report
+
+# E2E tests (Playwright)
+cd frontend
+npx playwright test              # Run all e2e tests
+npx playwright test --ui         # Run with UI mode
+npx playwright test --headed     # Run with visible browser
 ```
 
 ### API Endpoints
@@ -166,11 +236,18 @@ Database Layer (SQLite)
 
 ### Environment Variables
 
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `OPENAI_API_KEY` | OpenAI API key for AI agents | Yes |
-| `PHOENIX_API_KEY` | Phoenix tracing key | No |
-| `DATABASE_URL` | Database connection string | No (defaults to SQLite) |
+All environment variables are configured in the `.env` file in the project root. See `env_example.txt` for the complete template.
+
+| Variable | Description | Required | Default |
+|----------|-------------|----------|---------|
+| `OPENAI_API_KEY` | OpenAI API key for AI agents | **Yes** | None |
+| `PHOENIX_API_KEY` | Phoenix telemetry/tracing API key | No | None (skips tracing) |
+| `DATABASE_URL` | Database connection string | No | `sqlite:///kitchen_crew.db` |
+| `LOG_LEVEL` | Logging verbosity level | No | `INFO` |
+| `HOST` | API server host | No | `localhost` |
+| `PORT` | API server port | No | `8000` |
+
+**Note:** The application uses only the OpenAI API for all AI operations. The `SPOONACULAR_API_KEY` and `EDAMAM_API_KEY` variables in `env_example.txt` are placeholders for future recipe API integrations but are not currently used by the application.
 
 ## Contributing
 

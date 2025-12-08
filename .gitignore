@@ -107,4 +107,8 @@ dmypy.json
 kitchen_crew.db
 kitchen_crew.log
 *.db
-*.log 
+*.log
+
+# Service management
+.pids/
+logs/ 
