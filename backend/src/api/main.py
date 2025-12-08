@@ -18,7 +18,7 @@ if backend_dir not in sys.path:
 load_dotenv(os.path.join(backend_dir, '..', '.env'))
 load_dotenv()
 
-from src.api.routes import recipes, meal_plans, grocery_lists, chat
+from src.api.routes import recipes, meal_plans, grocery_lists, chat, pending_recipes
 
 
 @asynccontextmanager
@@ -67,6 +67,7 @@ app.include_router(recipes.router, prefix="/api/recipes", tags=["Recipes"])
 app.include_router(meal_plans.router, prefix="/api/meal-plans", tags=["Meal Plans"])
 app.include_router(grocery_lists.router, prefix="/api/grocery-lists", tags=["Grocery Lists"])
 app.include_router(chat.router, prefix="/api/chat", tags=["Chat"])
+app.include_router(pending_recipes.router, prefix="/api/pending-recipes", tags=["Pending Recipes"])
 
 
 @app.get("/")

@@ -140,6 +140,30 @@ def create_database():
         )
     ''')
     
+    # Pending recipes table (staging for user approval)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS pending_recipes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            description TEXT,
+            prep_time INTEGER,
+            cook_time INTEGER,
+            servings INTEGER,
+            difficulty TEXT,
+            cuisine TEXT,
+            dietary_tags TEXT,
+            ingredients TEXT,
+            instructions TEXT,
+            notes TEXT,
+            image_url TEXT,
+            nutritional_info TEXT,
+            source_url TEXT,
+            discovery_query TEXT,
+            status TEXT DEFAULT 'pending',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    
     # Commit changes and close connection
     conn.commit()
     conn.close()
