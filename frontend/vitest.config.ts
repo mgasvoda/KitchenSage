@@ -10,6 +10,8 @@ export default defineConfig({
     globals: true,
     css: true,
     reporters: ['verbose'],
+    include: ['src/**/*.{test,spec}.{ts,tsx}'],
+    exclude: ['node_modules/', 'e2e/**', 'dist/**'],
     coverage: {
       reporter: ['text', 'json', 'html'],
       exclude: [
