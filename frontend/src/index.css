@@ -1,0 +1,122 @@
+@import "tailwindcss";
+
+/* Custom theme variables */
+:root {
+  --color-sage: #7a9a6d;
+  --color-sage-light: #a3c293;
+  --color-sage-dark: #4a6b3f;
+  --color-cream: #faf8f5;
+  --color-terracotta: #c67b5c;
+  --color-terracotta-light: #e09f85;
+  --color-charcoal: #2d2d2d;
+  --color-warm-gray: #f5f3f0;
+}
+
+/* Custom Tailwind theme extension */
+@theme {
+  --color-sage-50: #f4f7f3;
+  --color-sage-100: #e6ede3;
+  --color-sage-200: #cddbc7;
+  --color-sage-300: #a8c29e;
+  --color-sage-400: #7a9a6d;
+  --color-sage-500: #5d7d52;
+  --color-sage-600: #496440;
+  --color-sage-700: #3b5034;
+  --color-sage-800: #31422c;
+  --color-sage-900: #283726;
+  
+  --color-terracotta-50: #fdf6f3;
+  --color-terracotta-100: #fbeae3;
+  --color-terracotta-200: #f7d4c6;
+  --color-terracotta-300: #f0b49c;
+  --color-terracotta-400: #e6896a;
+  --color-terracotta-500: #c67b5c;
+  --color-terracotta-600: #b15c3d;
+  --color-terracotta-700: #934a32;
+  --color-terracotta-800: #793f2d;
+  --color-terracotta-900: #653829;
+  
+  --color-cream-50: #fdfcfb;
+  --color-cream-100: #faf8f5;
+  --color-cream-200: #f5f1eb;
+  --color-cream-300: #ede7dc;
+  --color-cream-400: #e0d6c6;
+  --color-cream-500: #d1c3ac;
+  
+  --font-display: 'Playfair Display', Georgia, serif;
+  --font-body: 'Source Sans 3', system-ui, sans-serif;
+}
+
+/* Base styles */
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply bg-cream-100 text-charcoal antialiased;
+  font-family: var(--font-body);
+}
+
+/* Custom utility classes */
+.text-balance {
+  text-wrap: balance;
+}
+
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-sage-300) transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background-color: var(--color-sage-300);
+  border-radius: 3px;
+}
+
+/* Animation utilities */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slide-up {
+  from { 
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to { 
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out forwards;
+}
+
+.animate-slide-up {
+  animation: slide-up 0.4s ease-out forwards;
+}
+
+.animate-pulse-soft {
+  animation: pulse-soft 2s ease-in-out infinite;
+}
+
+/* Staggered animation delays */
+.stagger-1 { animation-delay: 0.1s; }
+.stagger-2 { animation-delay: 0.2s; }
+.stagger-3 { animation-delay: 0.3s; }
+.stagger-4 { animation-delay: 0.4s; }
+.stagger-5 { animation-delay: 0.5s; }
