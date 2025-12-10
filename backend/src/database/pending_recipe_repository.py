@@ -12,7 +12,8 @@ from datetime import datetime
 from src.models import (
     PendingRecipe, PendingRecipeCreate, PendingRecipeUpdate,
     PendingRecipeStatus, PendingRecipeIngredient,
-    RecipeCreate, DifficultyLevel, CuisineType, DietaryTag, IngredientCategory
+    RecipeCreate, DifficultyLevel, CuisineType, DietaryTag, IngredientCategory,
+    MeasurementUnit
 )
 from .base_repository import BaseRepository
 from .connection import get_db_session, RecordNotFoundError, ValidationError
@@ -291,7 +292,7 @@ class PendingRecipeRepository(BaseRepository[PendingRecipe]):
                 ingredients_data.append({
                     'name': ing.name,
                     'quantity': ing.quantity or 1.0,
-                    'unit': ing.unit or 'unit',
+                    'unit': ing.unit or MeasurementUnit.ITEM.value,
                     'notes': ing.notes,
                     'category': IngredientCategory.OTHER
                 })

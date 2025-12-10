@@ -1,0 +1,64 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - complementary [ref=e4]:
+    - generic [ref=e6]:
+      - img [ref=e8]
+      - generic [ref=e10]:
+        - heading "KitchenSage" [level=1] [ref=e11]
+        - paragraph [ref=e12]: AI Cooking Assistant
+    - navigation [ref=e13]:
+      - list [ref=e14]:
+        - listitem [ref=e15]:
+          - link "Chat" [ref=e16] [cursor=pointer]:
+            - /url: /chat
+            - img [ref=e17]
+            - generic [ref=e19]: Chat
+        - listitem [ref=e20]:
+          - link "Discover" [ref=e21] [cursor=pointer]:
+            - /url: /discover
+            - img [ref=e22]
+            - generic [ref=e24]: Discover
+        - listitem [ref=e25]:
+          - link "Recipes" [ref=e26] [cursor=pointer]:
+            - /url: /recipes
+            - img [ref=e27]
+            - generic [ref=e29]: Recipes
+        - listitem [ref=e30]:
+          - link "Grocery List" [ref=e31] [cursor=pointer]:
+            - /url: /grocery
+            - img [ref=e32]
+            - generic [ref=e34]: Grocery List
+        - listitem [ref=e35]:
+          - link "Meal Plans" [ref=e36] [cursor=pointer]:
+            - /url: /calendar
+            - img [ref=e37]
+            - generic [ref=e39]: Meal Plans
+    - generic [ref=e41]: Powered by AI Agents
+  - main [ref=e42]:
+    - generic [ref=e43]:
+      - generic [ref=e44]:
+        - heading "Discover Recipes" [level=1] [ref=e45]
+        - paragraph [ref=e46]: Add new recipes by URL or discover them with AI search
+      - generic [ref=e48]:
+        - button "Add by URL" [ref=e49]:
+          - img [ref=e50]
+          - text: Add by URL
+        - button "AI Search" [ref=e52]:
+          - img [ref=e53]
+          - text: AI Search
+        - button "Pending Review" [active] [ref=e55]:
+          - img [ref=e56]
+          - text: Pending Review
+      - generic [ref=e59]:
+        - generic [ref=e60]:
+          - heading "Recipes Awaiting Review" [level=2] [ref=e61]
+          - button "Refresh" [ref=e62]:
+            - img [ref=e63]
+            - text: Refresh
+        - generic [ref=e65]:
+          - img [ref=e67]
+          - heading "All caught up!" [level=3] [ref=e69]
+          - paragraph [ref=e70]: No recipes pending review. Add some using URL or AI Search.
+```
