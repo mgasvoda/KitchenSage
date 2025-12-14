@@ -3,7 +3,8 @@ Meal Plan service - business logic layer for meal plan operations.
 """
 
 import logging
-from typing import Optional, List, Dict, Any
+import asyncio
+from typing import Optional, List, Dict, Any, AsyncGenerator
 
 from src.database import MealPlanRepository, DatabaseError, RecordNotFoundError
 from src.crew import KitchenCrew
@@ -171,6 +172,91 @@ class MealPlanService:
                 "status": "error",
                 "message": str(e),
             }
+    
+    async def create_meal_plan_stream(
+        self,
+        days: int = 7,
+        people: int = 2,
+        dietary_restrictions: Optional[List[str]] = None,
+        budget: Optional[float] = None,
+    ) -> AsyncGenerator[Dict[str, Any], None]:
+        """
+        Create a meal plan with streaming agent activity updates.
+        
+        Args:
+            days: Number of days for the meal plan
+            people: Number of people to plan for
+            dietary_restrictions: Dietary restrictions
+            budget: Optional budget constraint
+            
+        Yields:
+            Agent activity events during meal plan creation
+        """
+        import queue
+        import threading
+        
+        # Queue for events from callback thread
+        event_queue: queue.Queue = queue.Queue()
+        
+        def run_crew():
+            """Run the crew in a separate thread with callbacks."""
+            try:
+                result = self.kitchen_crew.create_meal_plan_with_callbacks(
+                    days=days,
+                    people=people,
+                    dietary_restrictions=dietary_restrictions,
+                    budget=budget,
+                    event_callback=lambda event: event_queue.put(event),
+                )
+                
+                # Extract final result
+                if hasattr(result, 'raw'):
+                    result_text = result.raw
+                else:
+                    result_text = str(result)
+                
+                event_queue.put({
+                    "type": "complete",
+                    "meal_plan": result_text,
+                })
+            except Exception as e:
+                logger.error(f"Error in crew execution: {e}")
+                event_queue.put({
+                    "type": "error",
+                    "content": str(e),
+                })
+            finally:
+                event_queue.put(None)  # Signal completion
+        
+        # Start the crew in a thread
+        thread = threading.Thread(target=run_crew)
+        thread.start()
+        
+        # Send initial event
+        yield {
+            "type": "agent_thinking",
+            "agent": "Meal Planning Expert",
+            "content": f"Starting meal plan for {days} days, {people} people...",
+        }
+        
+        # Stream events from the queue
+        while True:
+            try:
+                # Check for events with timeout to allow async cooperation
+                event = await asyncio.to_thread(event_queue.get, timeout=0.1)
+                
+                if event is None:
+                    break
+                    
+                yield event
+                
+            except queue.Empty:
+                continue
+            except Exception as e:
+                logger.error(f"Error getting event from queue: {e}")
+                break
+        
+        thread.join(timeout=5.0)
     
     def delete_meal_plan(self, meal_plan_id: int) -> Dict[str, Any]:
         """

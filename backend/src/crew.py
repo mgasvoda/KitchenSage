@@ -3,7 +3,7 @@ Main KitchenCrew class that orchestrates all cooking-related AI agents.
 """
 
 import logging
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Callable
 from crewai import Crew, Process
 from src.agents.recipe_manager import RecipeManagerAgent
 from src.agents.meal_planner import MealPlannerAgent
@@ -151,6 +151,189 @@ class KitchenCrew:
         )
         
         result = planning_crew.kickoff()
+        return result
+    
+    def create_meal_plan_with_callbacks(
+        self,
+        days: int = 7,
+        people: int = 2,
+        dietary_restrictions: Optional[List[str]] = None,
+        budget: Optional[float] = None,
+        event_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Create a meal plan with real-time callbacks for agent activity.
+        
+        Args:
+            days: Number of days for the meal plan
+            people: Number of people the plan should serve
+            dietary_restrictions: List of dietary restrictions
+            budget: Optional budget constraint
+            event_callback: Callback function to receive agent activity events
+            
+        Returns:
+            Dictionary containing the meal plan
+        """
+        self.logger.info(f"Creating meal plan with callbacks for {days} days, {people} people")
+        
+        def step_callback(step_output):
+            """Callback for each agent step."""
+            if event_callback is None:
+                return
+            
+            try:
+                # Get the class name to understand what type of output this is
+                class_name = type(step_output).__name__
+                
+                # Handle different CrewAI output types
+                if class_name == 'AgentFinish':
+                    # Agent finished thinking - extract the output
+                    output = getattr(step_output, 'output', None) or getattr(step_output, 'return_values', {})
+                    if isinstance(output, dict):
+                        output_text = output.get('output', str(output))
+                    else:
+                        output_text = str(output) if output else "Processing complete"
+                    # Clean up the output for display
+                    output_text = output_text[:150] if len(str(output_text)) > 150 else str(output_text)
+                    event_callback({
+                        "type": "agent_thinking",
+                        "agent": "Meal Planning Expert",
+                        "content": f"Completed analysis: {output_text}",
+                    })
+                    
+                elif class_name == 'ToolResult' or hasattr(step_output, 'result'):
+                    # Tool returned a result
+                    result = getattr(step_output, 'result', str(step_output))
+                    tool_name = getattr(step_output, 'tool', 'Tool')
+                    # Parse result if it's a string that looks like JSON
+                    if isinstance(result, str):
+                        try:
+                            import json
+                            parsed = json.loads(result.replace("'", '"'))
+                            if parsed.get('status') == 'success':
+                                summary = parsed.get('message', 'Completed successfully')
+                            else:
+                                summary = parsed.get('message', result[:100])
+                        except:
+                            summary = result[:100] if len(result) > 100 else result
+                    else:
+                        summary = str(result)[:100]
+                    event_callback({
+                        "type": "tool_result",
+                        "tool": tool_name,
+                        "summary": summary,
+                    })
+                    
+                elif hasattr(step_output, 'tool') and step_output.tool:
+                    # Tool is being invoked
+                    tool_input = getattr(step_output, 'tool_input', '')
+                    if isinstance(tool_input, dict):
+                        # Extract meaningful info from the tool input
+                        input_summary = ', '.join([f"{k}: {str(v)[:30]}" for k, v in list(tool_input.items())[:3]])
+                    else:
+                        input_summary = str(tool_input)[:80]
+                    event_callback({
+                        "type": "tool_start",
+                        "agent": "Meal Planning Expert",
+                        "tool": step_output.tool,
+                        "input_summary": input_summary,
+                    })
+                    
+                elif hasattr(step_output, 'log') or hasattr(step_output, 'thought'):
+                    # Agent is thinking
+                    thought = getattr(step_output, 'log', None) or getattr(step_output, 'thought', '')
+                    if thought:
+                        # Clean up thought for display
+                        thought_clean = str(thought).strip()[:150]
+                        event_callback({
+                            "type": "agent_thinking",
+                            "agent": "Meal Planning Expert", 
+                            "content": thought_clean,
+                        })
+                        
+            except Exception as e:
+                self.logger.error(f"Error in step callback: {e}")
+        
+        def task_callback(task_output):
+            """Callback for task completion."""
+            if event_callback is None:
+                return
+            
+            try:
+                # Get a meaningful task name
+                task_desc = getattr(task_output, 'description', None)
+                if task_desc:
+                    # Extract first line or first 50 chars
+                    task_name = task_desc.split('\n')[0][:50]
+                else:
+                    task_name = "Task"
+                
+                # Get a meaningful summary from the output
+                raw_output = getattr(task_output, 'raw', None) or getattr(task_output, 'output', None)
+                if raw_output:
+                    # Get first meaningful line
+                    lines = [l.strip() for l in str(raw_output).split('\n') if l.strip()]
+                    summary = lines[0][:100] if lines else "Completed"
+                else:
+                    summary = "Completed successfully"
+                
+                event_callback({
+                    "type": "task_complete",
+                    "task": task_name,
+                    "summary": summary,
+                })
+            except Exception as e:
+                self.logger.error(f"Error in task callback: {e}")
+        
+        # Send initial planning events
+        if event_callback:
+            event_callback({
+                "type": "agent_thinking",
+                "agent": "Meal Planning Expert",
+                "content": f"Analyzing requirements: {days} days, {people} people" + 
+                          (f", restrictions: {', '.join(dietary_restrictions)}" if dietary_restrictions else ""),
+            })
+        
+        # Create meal planning task with proper agent assignment
+        meal_plan_task = self.meal_planning_tasks.create_meal_plan_task(
+            days=days,
+            people=people,
+            dietary_restrictions=dietary_restrictions,
+            budget=budget
+        )
+        meal_plan_task.agent = self.meal_planner.agent
+        
+        # Create recipe fetching task with proper agent assignment
+        recipe_fetch_task = self.recipe_tasks.fetch_recipes_for_plan_task()
+        recipe_fetch_task.agent = self.recipe_manager.agent
+        
+        if event_callback:
+            event_callback({
+                "type": "tool_start",
+                "agent": "Meal Planning Expert",
+                "tool": "Recipe Search Tool",
+                "input_summary": "Searching for recipes matching criteria...",
+            })
+        
+        # Create meal planning crew with callbacks
+        planning_crew = Crew(
+            agents=[self.meal_planner.agent, self.recipe_manager.agent],
+            tasks=[meal_plan_task, recipe_fetch_task],
+            process=Process.sequential,
+            verbose=True,
+            step_callback=step_callback,
+            task_callback=task_callback,
+        )
+        
+        result = planning_crew.kickoff()
+        
+        if event_callback:
+            event_callback({
+                "type": "task_complete",
+                "task": "Meal Plan Generation",
+                "summary": "Successfully created meal plan",
+            })
+        
         return result
     
     def generate_grocery_list(self, meal_plan_id: int) -> Dict[str, Any]:

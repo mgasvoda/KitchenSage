@@ -16,6 +16,7 @@ import type {
   DiscoverRecipesResponse,
   PendingRecipeListResponse,
   ApproveRecipeResponse,
+  AgentActivityEvent,
 } from '../types';
 
 const API_BASE = '/api';
@@ -160,6 +161,71 @@ export const mealPlanApi = {
     return fetchApi(`/meal-plans?${searchParams.toString()}`, {
       method: 'POST',
     });
+  },
+
+  /**
+   * Create a meal plan with streaming agent activity updates.
+   * Uses Server-Sent Events to stream real-time progress.
+   */
+  streamCreate: async function* (params: {
+    days?: number;
+    people?: number;
+    dietary_restrictions?: string[];
+    budget?: number;
+  }): AsyncGenerator<AgentActivityEvent> {
+    const searchParams = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        if (Array.isArray(value)) {
+          value.forEach(v => searchParams.append(key, v));
+        } else {
+          searchParams.append(key, String(value));
+        }
+      }
+    });
+
+    const response = await fetch(`${API_BASE}/meal-plans/stream?${searchParams.toString()}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Meal plan creation failed: ${response.status}`);
+    }
+
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error('No response body');
+    }
+
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6)) as AgentActivityEvent;
+              yield data;
+            } catch {
+              // Skip invalid JSON
+            }
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
   },
 
   delete: async (id: number): Promise<{ status: string }> => {
