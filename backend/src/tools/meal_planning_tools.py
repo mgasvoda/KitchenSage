@@ -6,6 +6,7 @@ from crewai.tools import BaseTool
 from typing import Dict, List, Any, Optional
 from datetime import datetime, date, timedelta
 import logging
+import json
 
 from src.database import RecipeRepository, MealPlanRepository, DatabaseError
 from src.models import (
@@ -101,12 +102,12 @@ class MealPlanningTool(BaseTool):
             # Save to database
             meal_plan_data = {
                 'name': f"Meal Plan {start_date.strftime('%Y-%m-%d')}",
-                'start_date': start_date,
-                'end_date': start_date + timedelta(days=days-1),
+                'start_date': start_date.isoformat(),
+                'end_date': (start_date + timedelta(days=days-1)).isoformat(),
                 'people_count': people,
-                'dietary_restrictions': dietary_restrictions
+                'dietary_restrictions': json.dumps(dietary_restrictions) if dietary_restrictions else json.dumps([])
             }
-            
+
             meal_plan_id = self._get_repositories()['meal_plans'].create(meal_plan_data)
             meal_plan['meal_plan_id'] = meal_plan_id
             
