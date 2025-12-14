@@ -2,13 +2,76 @@
 Meal Plan API endpoints.
 """
 
-from typing import Optional, List
+import json
+from typing import Optional, List, AsyncGenerator
 from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import StreamingResponse
 
 from src.models import MealPlanCreate
 from src.services import MealPlanService
 
 router = APIRouter()
+
+
+async def generate_meal_plan_sse_stream(
+    days: int,
+    people: int,
+    dietary_restrictions: Optional[List[str]],
+    budget: Optional[float],
+) -> AsyncGenerator[str, None]:
+    """
+    Generate Server-Sent Events stream for meal plan creation.
+    
+    Streams agent activity events as the AI creates the meal plan.
+    """
+    service = MealPlanService()
+    
+    try:
+        async for event in service.create_meal_plan_stream(
+            days=days,
+            people=people,
+            dietary_restrictions=dietary_restrictions,
+            budget=budget,
+        ):
+            yield f"data: {json.dumps(event)}\n\n"
+        
+        # Send done event
+        yield f"data: {json.dumps({'type': 'done'})}\n\n"
+        
+    except Exception as e:
+        yield f"data: {json.dumps({'type': 'error', 'content': str(e)})}\n\n"
+        yield f"data: {json.dumps({'type': 'done'})}\n\n"
+
+
+@router.post("/stream", response_class=StreamingResponse)
+async def create_meal_plan_stream(
+    days: int = Query(7, ge=1, le=30, description="Number of days for the meal plan"),
+    people: int = Query(2, ge=1, le=20, description="Number of people to plan for"),
+    dietary_restrictions: Optional[List[str]] = Query(None, description="Dietary restrictions"),
+    budget: Optional[float] = Query(None, ge=0, description="Budget constraint"),
+):
+    """
+    Create a meal plan with real-time SSE streaming of agent activity.
+    
+    Streams events as the AI agent works:
+    - agent_thinking: Agent is reasoning
+    - tool_start: Tool is being invoked
+    - tool_result: Tool returned a result
+    - task_complete: A task finished
+    - preview_update: Partial meal plan preview
+    - complete: Final meal plan ready
+    - error: An error occurred
+    - done: Stream complete
+    """
+    return StreamingResponse(
+        generate_meal_plan_sse_stream(days, people, dietary_restrictions, budget),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        }
+    )
 
 
 @router.get("", response_model=dict)
