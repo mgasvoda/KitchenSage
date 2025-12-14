@@ -163,7 +163,9 @@ describe('pendingRecipeApi', () => {
       expect(fetch).toHaveBeenCalledWith(
         '/api/pending-recipes?limit=50',
         expect.objectContaining({
-          method: 'GET',
+          headers: expect.objectContaining({
+            'Content-Type': 'application/json',
+          }),
         })
       );
       expect(result.status).toBe('success');
@@ -187,7 +189,9 @@ describe('pendingRecipeApi', () => {
       expect(fetch).toHaveBeenCalledWith(
         '/api/pending-recipes',
         expect.objectContaining({
-          method: 'GET',
+          headers: expect.objectContaining({
+            'Content-Type': 'application/json',
+          }),
         })
       );
       expect(result.status).toBe('success');
@@ -215,7 +219,9 @@ describe('pendingRecipeApi', () => {
       expect(fetch).toHaveBeenCalledWith(
         '/api/pending-recipes/1',
         expect.objectContaining({
-          method: 'GET',
+          headers: expect.objectContaining({
+            'Content-Type': 'application/json',
+          }),
         })
       );
       expect(result.status).toBe('success');

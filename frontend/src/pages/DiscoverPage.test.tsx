@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '../test/test-utils';
+import { render, screen, waitFor, fireEvent, act } from '../test/test-utils';
 import { DiscoverPage } from './DiscoverPage';
 import { pendingRecipeApi } from '../services/api';
 import type { PendingRecipe } from '../types';
@@ -44,11 +44,19 @@ const mockPendingRecipe: PendingRecipe = {
 describe('DiscoverPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Mock the initial API call to prevent async state updates during render
+    vi.mocked(pendingRecipeApi.list).mockResolvedValue({
+      status: 'success',
+      pending_recipes: [],
+      total: 0,
+    });
   });
 
   describe('Tab Rendering', () => {
-    it('renders three tabs', () => {
-      render(<DiscoverPage />);
+    it('renders three tabs', async () => {
+      await act(async () => {
+        render(<DiscoverPage />);
+      });
       
       expect(screen.getByText('Add by URL')).toBeInTheDocument();
       expect(screen.getByText('AI Search')).toBeInTheDocument();
@@ -57,8 +65,10 @@ describe('DiscoverPage', () => {
   });
 
   describe('URL Parser', () => {
-    it('renders URL parser form', () => {
-      render(<DiscoverPage />);
+    it('renders URL parser form', async () => {
+      await act(async () => {
+        render(<DiscoverPage />);
+      });
       
       const urlInput = screen.getByPlaceholderText(/https:\/\/example.com\/recipe/);
       expect(urlInput).toBeInTheDocument();
@@ -77,13 +87,17 @@ describe('DiscoverPage', () => {
         total: 0,
       });
 
-      render(<DiscoverPage />);
+      await act(async () => {
+        render(<DiscoverPage />);
+      });
       
       const urlInput = screen.getByPlaceholderText(/https:\/\/example.com\/recipe/);
       const submitButton = screen.getByText('Parse Recipe');
       
-      fireEvent.change(urlInput, { target: { value: 'https://example.com/recipe' } });
-      fireEvent.click(submitButton);
+      await act(async () => {
+        fireEvent.change(urlInput, { target: { value: 'https://example.com/recipe' } });
+        fireEvent.click(submitButton);
+      });
 
       await waitFor(() => {
         expect(pendingRecipeApi.parseUrl).toHaveBeenCalledWith('https://example.com/recipe');
@@ -102,13 +116,17 @@ describe('DiscoverPage', () => {
         total: 0,
       });
 
-      render(<DiscoverPage />);
+      await act(async () => {
+        render(<DiscoverPage />);
+      });
       
       const urlInput = screen.getByPlaceholderText(/https:\/\/example.com\/recipe/);
       const submitButton = screen.getByText('Parse Recipe');
       
-      fireEvent.change(urlInput, { target: { value: 'https://example.com/recipe' } });
-      fireEvent.click(submitButton);
+      await act(async () => {
+        fireEvent.change(urlInput, { target: { value: 'https://example.com/recipe' } });
+        fireEvent.click(submitButton);
+      });
 
       await waitFor(() => {
         expect(screen.getByText('Test Recipe')).toBeInTheDocument();
@@ -123,13 +141,17 @@ describe('DiscoverPage', () => {
         total: 0,
       });
 
-      render(<DiscoverPage />);
+      await act(async () => {
+        render(<DiscoverPage />);
+      });
       
       const urlInput = screen.getByPlaceholderText(/https:\/\/example.com\/recipe/);
       const submitButton = screen.getByText('Parse Recipe');
       
-      fireEvent.change(urlInput, { target: { value: 'https://invalid-url.com' } });
-      fireEvent.click(submitButton);
+      await act(async () => {
+        fireEvent.change(urlInput, { target: { value: 'https://invalid-url.com' } });
+        fireEvent.click(submitButton);
+      });
 
       await waitFor(() => {
         expect(screen.getByText(/Failed to parse URL/i)).toBeInTheDocument();
@@ -140,7 +162,7 @@ describe('DiscoverPage', () => {
       vi.mocked(pendingRecipeApi.parseUrl).mockResolvedValue({
         status: 'duplicate',
         message: 'A recipe from this URL is already pending review',
-        pending_recipe: mockPendingRecipe,
+        // Don't include pending_recipe when status is duplicate
       });
       vi.mocked(pendingRecipeApi.list).mockResolvedValue({
         status: 'success',
@@ -148,13 +170,17 @@ describe('DiscoverPage', () => {
         total: 0,
       });
 
-      render(<DiscoverPage />);
+      await act(async () => {
+        render(<DiscoverPage />);
+      });
       
       const urlInput = screen.getByPlaceholderText(/https:\/\/example.com\/recipe/);
       const submitButton = screen.getByText('Parse Recipe');
       
-      fireEvent.change(urlInput, { target: { value: 'https://example.com/recipe' } });
-      fireEvent.click(submitButton);
+      await act(async () => {
+        fireEvent.change(urlInput, { target: { value: 'https://example.com/recipe' } });
+        fireEvent.click(submitButton);
+      });
 
       await waitFor(() => {
         expect(screen.getByText(/already pending review/i)).toBeInTheDocument();
@@ -163,15 +189,19 @@ describe('DiscoverPage', () => {
   });
 
   describe('AI Search', () => {
-    it('renders AI search form', () => {
-      render(<DiscoverPage />);
+    it('renders AI search form', async () => {
+      await act(async () => {
+        render(<DiscoverPage />);
+      });
       
       // Click on AI Search tab
       const searchTab = screen.getByText('AI Search');
-      fireEvent.click(searchTab);
+      await act(async () => {
+        fireEvent.click(searchTab);
+      });
       
       expect(screen.getByPlaceholderText(/quick weeknight pasta/i)).toBeInTheDocument();
-      expect(screen.getByText('Discover Recipes')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /discover recipes/i })).toBeInTheDocument();
     });
 
     it('submits search query', async () => {
@@ -187,16 +217,22 @@ describe('DiscoverPage', () => {
         total: 0,
       });
 
-      render(<DiscoverPage />);
+      await act(async () => {
+        render(<DiscoverPage />);
+      });
       
       const searchTab = screen.getByText('AI Search');
-      fireEvent.click(searchTab);
+      await act(async () => {
+        fireEvent.click(searchTab);
+      });
       
       const queryInput = screen.getByPlaceholderText(/quick weeknight pasta/i);
-      const submitButton = screen.getByText('Discover Recipes');
+      const submitButton = screen.getByRole('button', { name: /discover recipes/i });
       
-      fireEvent.change(queryInput, { target: { value: 'pasta recipes' } });
-      fireEvent.click(submitButton);
+      await act(async () => {
+        fireEvent.change(queryInput, { target: { value: 'pasta recipes' } });
+        fireEvent.click(submitButton);
+      });
 
       await waitFor(() => {
         expect(pendingRecipeApi.discover).toHaveBeenCalledWith({
@@ -220,10 +256,14 @@ describe('DiscoverPage', () => {
         total: 0,
       });
 
-      render(<DiscoverPage />);
+      await act(async () => {
+        render(<DiscoverPage />);
+      });
       
       const searchTab = screen.getByText('AI Search');
-      fireEvent.click(searchTab);
+      await act(async () => {
+        fireEvent.click(searchTab);
+      });
       
       // Select cuisine - find select element
       const cuisineSelects = screen.getAllByRole('combobox');
@@ -231,18 +271,24 @@ describe('DiscoverPage', () => {
         select.textContent?.includes('cuisine') || select.getAttribute('name')?.includes('cuisine')
       ) || cuisineSelects[0];
       if (cuisineSelect) {
-        fireEvent.change(cuisineSelect, { target: { value: 'italian' } });
+        await act(async () => {
+          fireEvent.change(cuisineSelect, { target: { value: 'italian' } });
+        });
       }
       
       // Toggle dietary restriction
       const vegetarianButton = screen.getByText(/vegetarian/i);
-      fireEvent.click(vegetarianButton);
+      await act(async () => {
+        fireEvent.click(vegetarianButton);
+      });
       
       const queryInput = screen.getByPlaceholderText(/quick weeknight pasta/i);
-      const submitButton = screen.getByText('Discover Recipes');
+      const submitButton = screen.getByRole('button', { name: /discover recipes/i });
       
-      fireEvent.change(queryInput, { target: { value: 'pasta' } });
-      fireEvent.click(submitButton);
+      await act(async () => {
+        fireEvent.change(queryInput, { target: { value: 'pasta' } });
+        fireEvent.click(submitButton);
+      });
 
       await waitFor(() => {
         expect(pendingRecipeApi.discover).toHaveBeenCalledWith({
@@ -270,16 +316,22 @@ describe('DiscoverPage', () => {
         total: 0,
       });
 
-      render(<DiscoverPage />);
+      await act(async () => {
+        render(<DiscoverPage />);
+      });
       
       const searchTab = screen.getByText('AI Search');
-      fireEvent.click(searchTab);
+      await act(async () => {
+        fireEvent.click(searchTab);
+      });
       
       const queryInput = screen.getByPlaceholderText(/quick weeknight pasta/i);
-      const submitButton = screen.getByText('Discover Recipes');
+      const submitButton = screen.getByRole('button', { name: /discover recipes/i });
       
-      fireEvent.change(queryInput, { target: { value: 'pasta' } });
-      fireEvent.click(submitButton);
+      await act(async () => {
+        fireEvent.change(queryInput, { target: { value: 'pasta' } });
+        fireEvent.click(submitButton);
+      });
 
       await waitFor(() => {
         expect(screen.getByText('Test Recipe')).toBeInTheDocument();
@@ -295,16 +347,22 @@ describe('DiscoverPage', () => {
         total: 0,
       });
 
-      render(<DiscoverPage />);
+      await act(async () => {
+        render(<DiscoverPage />);
+      });
       
       const searchTab = screen.getByText('AI Search');
-      fireEvent.click(searchTab);
+      await act(async () => {
+        fireEvent.click(searchTab);
+      });
       
       const queryInput = screen.getByPlaceholderText(/quick weeknight pasta/i);
-      const submitButton = screen.getByText('Discover Recipes');
+      const submitButton = screen.getByRole('button', { name: /discover recipes/i });
       
-      fireEvent.change(queryInput, { target: { value: 'pasta' } });
-      fireEvent.click(submitButton);
+      await act(async () => {
+        fireEvent.change(queryInput, { target: { value: 'pasta' } });
+        fireEvent.click(submitButton);
+      });
 
       await waitFor(() => {
         expect(screen.getByText(/Search failed/i)).toBeInTheDocument();
@@ -320,10 +378,14 @@ describe('DiscoverPage', () => {
         total: 1,
       });
 
-      render(<DiscoverPage />);
+      await act(async () => {
+        render(<DiscoverPage />);
+      });
       
       const pendingTab = screen.getByText(/Pending Review/);
-      fireEvent.click(pendingTab);
+      await act(async () => {
+        fireEvent.click(pendingTab);
+      });
 
       await waitFor(() => {
         expect(screen.getByText('Test Recipe')).toBeInTheDocument();
@@ -337,10 +399,14 @@ describe('DiscoverPage', () => {
         total: 0,
       });
 
-      render(<DiscoverPage />);
+      await act(async () => {
+        render(<DiscoverPage />);
+      });
       
       const pendingTab = screen.getByText(/Pending Review/);
-      fireEvent.click(pendingTab);
+      await act(async () => {
+        fireEvent.click(pendingTab);
+      });
 
       await waitFor(() => {
         expect(screen.getByText(/All caught up!/i)).toBeInTheDocument();
@@ -354,13 +420,19 @@ describe('DiscoverPage', () => {
         total: 0,
       });
 
-      render(<DiscoverPage />);
+      await act(async () => {
+        render(<DiscoverPage />);
+      });
       
       const pendingTab = screen.getByText(/Pending Review/);
-      fireEvent.click(pendingTab);
+      await act(async () => {
+        fireEvent.click(pendingTab);
+      });
       
       const refreshButton = screen.getByText('Refresh');
-      fireEvent.click(refreshButton);
+      await act(async () => {
+        fireEvent.click(refreshButton);
+      });
 
       await waitFor(() => {
         expect(pendingRecipeApi.list).toHaveBeenCalledTimes(2); // Initial load + refresh
@@ -384,17 +456,23 @@ describe('DiscoverPage', () => {
         recipe_id: 1,
       });
 
-      render(<DiscoverPage />);
+      await act(async () => {
+        render(<DiscoverPage />);
+      });
       
       const pendingTab = screen.getByText(/Pending Review/);
-      fireEvent.click(pendingTab);
+      await act(async () => {
+        fireEvent.click(pendingTab);
+      });
 
       await waitFor(() => {
         expect(screen.getByText('Test Recipe')).toBeInTheDocument();
       });
 
       const approveButton = screen.getByText('Approve');
-      fireEvent.click(approveButton);
+      await act(async () => {
+        fireEvent.click(approveButton);
+      });
 
       await waitFor(() => {
         expect(pendingRecipeApi.approve).toHaveBeenCalledWith(1);
@@ -407,17 +485,23 @@ describe('DiscoverPage', () => {
         message: 'Recipe rejected',
       });
 
-      render(<DiscoverPage />);
+      await act(async () => {
+        render(<DiscoverPage />);
+      });
       
       const pendingTab = screen.getByText(/Pending Review/);
-      fireEvent.click(pendingTab);
+      await act(async () => {
+        fireEvent.click(pendingTab);
+      });
 
       await waitFor(() => {
         expect(screen.getByText('Test Recipe')).toBeInTheDocument();
       });
 
       const rejectButton = screen.getByText('Reject');
-      fireEvent.click(rejectButton);
+      await act(async () => {
+        fireEvent.click(rejectButton);
+      });
 
       await waitFor(() => {
         expect(pendingRecipeApi.reject).toHaveBeenCalledWith(1);
@@ -425,17 +509,23 @@ describe('DiscoverPage', () => {
     });
 
     it('opens edit modal', async () => {
-      render(<DiscoverPage />);
+      await act(async () => {
+        render(<DiscoverPage />);
+      });
       
       const pendingTab = screen.getByText(/Pending Review/);
-      fireEvent.click(pendingTab);
+      await act(async () => {
+        fireEvent.click(pendingTab);
+      });
 
       await waitFor(() => {
         expect(screen.getByText('Test Recipe')).toBeInTheDocument();
       });
 
       const editButton = screen.getByText('Edit');
-      fireEvent.click(editButton);
+      await act(async () => {
+        fireEvent.click(editButton);
+      });
 
       await waitFor(() => {
         expect(screen.getByText('Edit Recipe')).toBeInTheDocument();
@@ -449,17 +539,23 @@ describe('DiscoverPage', () => {
         pending_recipe: { ...mockPendingRecipe, name: 'Updated Recipe' },
       });
 
-      render(<DiscoverPage />);
+      await act(async () => {
+        render(<DiscoverPage />);
+      });
       
       const pendingTab = screen.getByText(/Pending Review/);
-      fireEvent.click(pendingTab);
+      await act(async () => {
+        fireEvent.click(pendingTab);
+      });
 
       await waitFor(() => {
         expect(screen.getByText('Test Recipe')).toBeInTheDocument();
       });
 
       const editButton = screen.getByText('Edit');
-      fireEvent.click(editButton);
+      await act(async () => {
+        fireEvent.click(editButton);
+      });
 
       await waitFor(() => {
         expect(screen.getByText('Edit Recipe')).toBeInTheDocument();
@@ -468,10 +564,14 @@ describe('DiscoverPage', () => {
       // Find name input - it should be the first text input in the modal
       const nameInputs = screen.getAllByRole('textbox');
       const nameInput = nameInputs[0] || screen.getByDisplayValue('Test Recipe');
-      fireEvent.change(nameInput, { target: { value: 'Updated Recipe' } });
+      await act(async () => {
+        fireEvent.change(nameInput, { target: { value: 'Updated Recipe' } });
+      });
 
       const saveButton = screen.getByText('Save Changes');
-      fireEvent.click(saveButton);
+      await act(async () => {
+        fireEvent.click(saveButton);
+      });
 
       await waitFor(() => {
         expect(pendingRecipeApi.update).toHaveBeenCalled();
@@ -480,20 +580,26 @@ describe('DiscoverPage', () => {
   });
 
   describe('Tab Switching', () => {
-    it('switches between tabs', () => {
-      render(<DiscoverPage />);
+    it('switches between tabs', async () => {
+      await act(async () => {
+        render(<DiscoverPage />);
+      });
       
       // Start on URL tab
       expect(screen.getByPlaceholderText(/https:\/\/example.com\/recipe/)).toBeInTheDocument();
       
       // Switch to search tab
       const searchTab = screen.getByText('AI Search');
-      fireEvent.click(searchTab);
+      await act(async () => {
+        fireEvent.click(searchTab);
+      });
       expect(screen.getByPlaceholderText(/quick weeknight pasta/i)).toBeInTheDocument();
       
       // Switch to pending tab
       const pendingTab = screen.getByText(/Pending Review/);
-      fireEvent.click(pendingTab);
+      await act(async () => {
+        fireEvent.click(pendingTab);
+      });
       expect(screen.getByText(/Recipes Awaiting Review/i)).toBeInTheDocument();
     });
   });
@@ -512,13 +618,17 @@ describe('DiscoverPage', () => {
         total: 0,
       });
 
-      render(<DiscoverPage />);
+      await act(async () => {
+        render(<DiscoverPage />);
+      });
       
       const urlInput = screen.getByPlaceholderText(/https:\/\/example.com\/recipe/);
       const submitButton = screen.getByText('Parse Recipe');
       
-      fireEvent.change(urlInput, { target: { value: 'https://example.com/recipe' } });
-      fireEvent.click(submitButton);
+      await act(async () => {
+        fireEvent.change(urlInput, { target: { value: 'https://example.com/recipe' } });
+        fireEvent.click(submitButton);
+      });
 
       expect(screen.getByText('Parsing...')).toBeInTheDocument();
     });
@@ -536,16 +646,22 @@ describe('DiscoverPage', () => {
         total: 0,
       });
 
-      render(<DiscoverPage />);
+      await act(async () => {
+        render(<DiscoverPage />);
+      });
       
       const searchTab = screen.getByText('AI Search');
-      fireEvent.click(searchTab);
+      await act(async () => {
+        fireEvent.click(searchTab);
+      });
       
       const queryInput = screen.getByPlaceholderText(/quick weeknight pasta/i);
-      const submitButton = screen.getByText('Discover Recipes');
+      const submitButton = screen.getByRole('button', { name: /discover recipes/i });
       
-      fireEvent.change(queryInput, { target: { value: 'pasta' } });
-      fireEvent.click(submitButton);
+      await act(async () => {
+        fireEvent.change(queryInput, { target: { value: 'pasta' } });
+        fireEvent.click(submitButton);
+      });
 
       expect(screen.getByText('Searching...')).toBeInTheDocument();
     });

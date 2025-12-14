@@ -54,7 +54,7 @@ test.describe('Discover Page', () => {
       }
     });
 
-    await page.route('**/api/pending-recipes/list*', async route => {
+    await page.route('**/api/pending-recipes*', async route => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -142,7 +142,7 @@ test.describe('Discover Page', () => {
       }
     });
 
-    await page.route('**/api/pending-recipes/list*', async route => {
+    await page.route('**/api/pending-recipes*', async route => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -207,7 +207,7 @@ test.describe('Discover Page', () => {
       });
     });
 
-    await page.route('**/api/pending-recipes/list*', async route => {
+    await page.route('**/api/pending-recipes*', async route => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -273,7 +273,7 @@ test.describe('Discover Page', () => {
       });
     });
 
-    await page.route('**/api/pending-recipes/list*', async route => {
+    await page.route('**/api/pending-recipes*', async route => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -357,7 +357,7 @@ test.describe('Discover Page', () => {
 
   test('duplicate detection', async ({ page }) => {
     // Mock list response first
-    await page.route('**/api/pending-recipes/list*', async route => {
+    await page.route('**/api/pending-recipes*', async route => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -391,8 +391,8 @@ test.describe('Discover Page', () => {
   });
 
   test('pending queue navigation', async ({ page }) => {
-    // Set up route BEFORE navigating to page - match exact API endpoint
-    await page.route('**/api/pending-recipes', async route => {
+    // Set up route BEFORE navigating to page - match exact API endpoint with query params
+    await page.route('**/api/pending-recipes*', async route => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -419,12 +419,12 @@ test.describe('Discover Page', () => {
       });
     });
 
-    // Now navigate to page (route is set up, so API call will be mocked)
+    // Navigate to page fresh since we need the mock to be active from the start
     await page.goto('/discover');
     await page.waitForSelector('text=Discover Recipes');
 
     // Wait a moment for initial API call to complete
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(1000);
 
     // Navigate to pending tab
     await page.getByRole('button', { name: /Pending Review/ }).click();
@@ -435,8 +435,8 @@ test.describe('Discover Page', () => {
   });
 
   test('empty pending queue', async ({ page }) => {
-    // Mock empty pending list
-    await page.route('**/api/pending-recipes/list*', async route => {
+    // Mock empty pending list - should match the actual API endpoint without /list
+    await page.route('**/api/pending-recipes*', async route => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -467,7 +467,7 @@ test.describe('Discover Page', () => {
       });
     });
 
-    await page.route('**/api/pending-recipes/list*', async route => {
+    await page.route('**/api/pending-recipes*', async route => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -514,7 +514,7 @@ test.describe('Discover Page', () => {
       });
     });
 
-    await page.route('**/api/pending-recipes/list*', async route => {
+    await page.route('**/api/pending-recipes*', async route => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -549,8 +549,8 @@ test.describe('Discover Page', () => {
   });
 
   test('recipe card interactions', async ({ page }) => {
-    // Set up routes BEFORE navigating to page - match exact API endpoint
-    await page.route('**/api/pending-recipes', async route => {
+    // Set up routes BEFORE navigating to page - match exact API endpoint with query params
+    await page.route('**/api/pending-recipes*', async route => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -584,12 +584,12 @@ test.describe('Discover Page', () => {
       });
     });
 
-    // Now navigate to page (route is set up, so API call will be mocked)
+    // Navigate to page fresh since we need the mock to be active from the start
     await page.goto('/discover');
     await page.waitForSelector('text=Discover Recipes');
 
     // Wait a moment for initial API call to complete
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(1000);
 
     // Navigate to pending tab
     await page.getByRole('button', { name: /Pending Review/ }).click();

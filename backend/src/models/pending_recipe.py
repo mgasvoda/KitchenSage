@@ -94,6 +94,13 @@ class PendingRecipe(BaseModel):
                 result.append(item)
         return result
     
+    @validator('notes', pre=True)
+    def validate_notes(cls, v):
+        """Convert notes from list to string if needed."""
+        if isinstance(v, list):
+            return ' '.join(str(item) for item in v if item)
+        return v
+    
     class Config:
         """Pydantic configuration."""
         from_attributes = True
@@ -142,6 +149,13 @@ class PendingRecipeCreate(BaseModel):
             elif isinstance(item, PendingRecipeIngredient):
                 result.append(item)
         return result
+    
+    @validator('notes', pre=True)
+    def validate_notes(cls, v):
+        """Convert notes from list to string if needed."""
+        if isinstance(v, list):
+            return ' '.join(str(item) for item in v if item)
+        return v
 
 
 class PendingRecipeUpdate(BaseModel):

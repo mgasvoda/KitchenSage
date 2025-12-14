@@ -404,7 +404,7 @@ export function DiscoverPage() {
                             : 'bg-cream-100 text-sage-700 hover:bg-cream-200'
                         }`}
                       >
-                        {tag.replace('_', ' ')}
+                        {tag.replace(/_/g, ' ')}
                       </button>
                     ))}
                   </div>

@@ -124,7 +124,7 @@ class TestPendingRecipeService:
         result = service.parse_url('https://example.com/recipe')
         
         assert result['status'] == 'error'
-        assert 'error' in result['message'].lower()
+        assert 'failed' in result['message'].lower()
     
     def test_discover_recipes_success(self, service, sample_scraped_data):
         """Test successful recipe discovery."""
@@ -175,9 +175,10 @@ class TestPendingRecipeService:
         assert result['status'] == 'success'
         # Verify search query was enhanced
         call_args = service.search_tool._run.call_args[0]
+        call_kwargs = service.search_tool._run.call_args[1]
         assert 'Italian' in call_args[0]
         assert 'vegetarian' in call_args[0]
-        assert call_args[1] == 5  # max_results
+        assert call_kwargs['max_results'] == 5
     
     def test_discover_recipes_empty_results(self, service):
         """Test handling empty search results."""

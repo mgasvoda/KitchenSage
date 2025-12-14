@@ -57,8 +57,9 @@
           - button "Refresh" [ref=e62]:
             - img [ref=e63]
             - text: Refresh
-        - generic [ref=e65]:
-          - img [ref=e67]
-          - heading "All caught up!" [level=3] [ref=e69]
-          - paragraph [ref=e70]: No recipes pending review. Add some using URL or AI Search.
+        - generic [ref=e65]: Request failed
+        - generic [ref=e66]:
+          - img [ref=e68]
+          - heading "All caught up!" [level=3] [ref=e70]
+          - paragraph [ref=e71]: No recipes pending review. Add some using URL or AI Search.
 ```
