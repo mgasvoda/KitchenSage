@@ -1,0 +1,112 @@
+# Frontend Cursor Rules for KitchenSage
+
+## Tech Stack
+- React 18+ with TypeScript
+- Vite as build tool
+- Tailwind CSS for styling
+- React Router for navigation
+
+## Component Conventions
+
+### File Structure
+- Components in `src/components/` organized by feature
+- Pages in `src/pages/`
+- Types in `src/types/`
+- API client in `src/services/api.ts`
+
+### Component Patterns
+```typescript
+// Prefer function components with explicit exports
+export function MyComponent() {
+  // hooks at top
+  const [state, setState] = useState();
+  
+  // handlers
+  const handleClick = () => {};
+  
+  // render
+  return <div>...</div>;
+}
+```
+
+### Naming
+- Components: PascalCase (e.g., `RecipeCard.tsx`)
+- Hooks: camelCase with `use` prefix (e.g., `useRecipes.ts`)
+- Types: PascalCase (e.g., `Recipe`, `MealPlan`)
+- CSS classes: kebab-case via Tailwind
+
+## Styling Guidelines
+
+### Theme Colors (Custom)
+- `sage-*`: Primary green palette (100-900)
+- `terracotta-*`: Accent orange palette (100-900)
+- `cream-*`: Background neutral palette (50-500)
+
+### Usage
+```tsx
+// Prefer semantic color usage
+<div className="bg-sage-600 text-cream-100">  // Primary action
+<div className="bg-terracotta-500 text-white">  // Accent/CTA
+<div className="bg-cream-50 text-sage-800">  // Background
+```
+
+### Animation
+- Use built-in `animate-fade-in`, `animate-slide-up`
+- Stagger with `stagger-1` through `stagger-5`
+- Prefer CSS transitions over JS animations
+
+## API Integration
+
+### Using the API Client
+```typescript
+import { recipeApi, chatApi } from '../services/api';
+
+// Typed responses
+const { recipes } = await recipeApi.list({ search: 'pasta' });
+
+// Streaming chat
+for await (const event of chatApi.streamMessage(message)) {
+  if (event.type === 'token') {
+    // handle streaming token
+  }
+}
+```
+
+### Error Handling
+```typescript
+try {
+  const data = await recipeApi.get(id);
+} catch (error) {
+  setError(error instanceof Error ? error.message : 'Failed');
+}
+```
+
+## Testing
+
+### Component Tests
+- Place tests in `__tests__/` subdirectory or `.test.tsx` suffix
+- Use React Testing Library
+- Test user interactions, not implementation
+
+## Performance
+
+### Best Practices
+- Use `useState` lazy initialization for expensive computations
+- Memoize callbacks with `useCallback` when passed to children
+- Use `useMemo` for expensive derived state
+- Avoid inline object/array creation in JSX
+
+### Loading States
+```tsx
+{loading && <LoadingSpinner />}
+{error && <ErrorMessage message={error} />}
+{!loading && data && <Content data={data} />}
+```
+
+## Accessibility
+
+- Include ARIA labels for interactive elements
+- Use semantic HTML (button, nav, main, etc.)
+- Ensure color contrast meets WCAG AA
+- Support keyboard navigation
+
