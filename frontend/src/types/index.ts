@@ -119,6 +119,48 @@ export interface ChatStreamEvent {
   intent?: string;
 }
 
+// Agent Activity types for meal plan streaming
+export type AgentActivityEventType = 
+  | 'agent_thinking'
+  | 'tool_start'
+  | 'tool_result'
+  | 'task_complete'
+  | 'preview_update'
+  | 'complete'
+  | 'error'
+  | 'done';
+
+export interface AgentActivityEvent {
+  type: AgentActivityEventType;
+  agent?: string;
+  content?: string;
+  tool?: string;
+  input_summary?: string;
+  summary?: string;
+  task?: string;
+  meal_plan?: string;
+  preview?: MealPlanPreview;
+}
+
+export interface MealPlanPreview {
+  days: MealPlanDayPreview[];
+}
+
+export interface MealPlanDayPreview {
+  date: string;
+  breakfast?: string | 'pending';
+  lunch?: string | 'pending';
+  dinner?: string | 'pending';
+}
+
+export interface ActivityLogItem {
+  id: string;
+  type: AgentActivityEventType;
+  content: string;
+  timestamp: Date;
+  isActive?: boolean;
+}
+
 // Pending Recipe types
 export type PendingRecipeStatus = 'pending' | 'approved' | 'rejected';
 
