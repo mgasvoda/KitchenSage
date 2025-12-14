@@ -11,6 +11,11 @@ import type {
   GroceryListListResponse,
   ChatStreamEvent,
   ChatMessage,
+  PendingRecipe,
+  ParseUrlResponse,
+  DiscoverRecipesResponse,
+  PendingRecipeListResponse,
+  ApproveRecipeResponse,
 } from '../types';
 
 const API_BASE = '/api';
@@ -285,6 +290,77 @@ export const chatApi = {
           content: m.content,
         })),
       }),
+    });
+  },
+};
+
+// Pending Recipe API for URL parsing and AI discovery
+export const pendingRecipeApi = {
+  /**
+   * Parse a recipe from a URL and save it for review.
+   */
+  parseUrl: async (url: string): Promise<ParseUrlResponse> => {
+    return fetchApi('/pending-recipes/parse', {
+      method: 'POST',
+      body: JSON.stringify({ url }),
+    });
+  },
+
+  /**
+   * Discover new recipes using AI-powered search.
+   */
+  discover: async (params: {
+    query: string;
+    cuisine?: string;
+    dietary_restrictions?: string[];
+    max_results?: number;
+  }): Promise<DiscoverRecipesResponse> => {
+    return fetchApi('/pending-recipes/discover', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    });
+  },
+
+  /**
+   * List all pending recipes awaiting review.
+   */
+  list: async (limit?: number): Promise<PendingRecipeListResponse> => {
+    const query = limit ? `?limit=${limit}` : '';
+    return fetchApi(`/pending-recipes${query}`);
+  },
+
+  /**
+   * Get a specific pending recipe by ID.
+   */
+  get: async (id: number): Promise<{ status: string; pending_recipe: PendingRecipe }> => {
+    return fetchApi(`/pending-recipes/${id}`);
+  },
+
+  /**
+   * Update a pending recipe before approval.
+   */
+  update: async (id: number, data: Partial<PendingRecipe>): Promise<{ status: string; pending_recipe: PendingRecipe }> => {
+    return fetchApi(`/pending-recipes/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  /**
+   * Approve a pending recipe and add it to the main collection.
+   */
+  approve: async (id: number): Promise<ApproveRecipeResponse> => {
+    return fetchApi(`/pending-recipes/${id}/approve`, {
+      method: 'POST',
+    });
+  },
+
+  /**
+   * Reject and delete a pending recipe.
+   */
+  reject: async (id: number): Promise<{ status: string; message: string }> => {
+    return fetchApi(`/pending-recipes/${id}`, {
+      method: 'DELETE',
     });
   },
 };

@@ -85,7 +85,11 @@ def create_database():
             end_date DATE,
             people_count INTEGER,
             dietary_restrictions TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            description TEXT,
+            budget_target REAL,
+            calories_per_day_target INTEGER,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
     
@@ -97,6 +101,8 @@ def create_database():
             recipe_id INTEGER,
             meal_type TEXT,
             meal_date DATE,
+            servings_override INTEGER,
+            notes TEXT,
             FOREIGN KEY (meal_plan_id) REFERENCES meal_plans (id),
             FOREIGN KEY (recipe_id) REFERENCES recipes (id)
         )
@@ -135,6 +141,31 @@ def create_database():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             preference_key TEXT UNIQUE NOT NULL,
             preference_value TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    
+    # Pending recipes table (staging for user approval)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS pending_recipes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            description TEXT,
+            prep_time INTEGER,
+            cook_time INTEGER,
+            servings INTEGER,
+            difficulty TEXT,
+            cuisine TEXT,
+            dietary_tags TEXT,
+            ingredients TEXT,
+            instructions TEXT,
+            notes TEXT,
+            image_url TEXT,
+            nutritional_info TEXT,
+            source_url TEXT,
+            discovery_query TEXT,
+            status TEXT DEFAULT 'pending',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )

@@ -119,6 +119,64 @@ export interface ChatStreamEvent {
   intent?: string;
 }
 
+// Pending Recipe types
+export type PendingRecipeStatus = 'pending' | 'approved' | 'rejected';
+
+export interface PendingRecipeIngredient {
+  name: string;
+  quantity?: number;
+  unit?: string;
+  notes?: string;
+}
+
+export interface PendingRecipe {
+  id: number;
+  name: string;
+  description?: string;
+  prep_time?: number;
+  cook_time?: number;
+  servings?: number;
+  difficulty?: string;
+  cuisine?: string;
+  dietary_tags: string[];
+  ingredients: PendingRecipeIngredient[];
+  instructions: string[];
+  notes?: string;
+  image_url?: string;
+  nutritional_info?: Record<string, number>;
+  source_url?: string;
+  discovery_query?: string;
+  status: PendingRecipeStatus;
+  created_at?: string;
+  is_duplicate?: boolean;
+}
+
+export interface ParseUrlResponse {
+  status: string;
+  message: string;
+  pending_recipe?: PendingRecipe;
+}
+
+export interface DiscoverRecipesResponse {
+  status: string;
+  message: string;
+  pending_recipes?: PendingRecipe[];
+  query?: string;
+}
+
+export interface PendingRecipeListResponse {
+  status: string;
+  pending_recipes: PendingRecipe[];
+  total: number;
+}
+
+export interface ApproveRecipeResponse {
+  status: string;
+  message: string;
+  recipe_id?: number;
+  pending_id?: number;
+}
+
 // API Response types
 export interface ApiResponse<T> {
   status: 'success' | 'error';

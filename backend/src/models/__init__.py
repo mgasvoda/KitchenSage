@@ -16,6 +16,10 @@ from .grocery_list import (
     GroceryItemStatus
 )
 from .nutritional_info import NutritionalInfo
+from .pending_recipe import (
+    PendingRecipe, PendingRecipeCreate, PendingRecipeUpdate,
+    PendingRecipeStatus, PendingRecipeIngredient
+)
 
 __all__ = [
     # Recipe models
@@ -50,4 +54,11 @@ __all__ = [
     
     # Nutritional models
     "NutritionalInfo",
+    
+    # Pending recipe models
+    "PendingRecipe",
+    "PendingRecipeCreate",
+    "PendingRecipeUpdate",
+    "PendingRecipeStatus",
+    "PendingRecipeIngredient",
 ] 

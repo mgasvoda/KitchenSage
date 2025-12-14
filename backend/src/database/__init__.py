@@ -28,6 +28,7 @@ from .recipe_repository import (
 from .meal_plan_repository import MealPlanRepository
 
 from .grocery_repository import GroceryRepository
+from .pending_recipe_repository import PendingRecipeRepository
 
 __all__ = [
     # Connection utilities
@@ -49,6 +50,7 @@ __all__ = [
     "IngredientRepository",
     "MealPlanRepository",
     "GroceryRepository",
+    "PendingRecipeRepository",
 ]
 
 
@@ -65,4 +67,5 @@ def get_repositories():
         'ingredients': IngredientRepository(),
         'meal_plans': MealPlanRepository(),
         'grocery_lists': GroceryRepository(),
+        'pending_recipes': PendingRecipeRepository(),
     } 

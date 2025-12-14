@@ -104,12 +104,31 @@ class MealPlanningTool(BaseTool):
                 'start_date': start_date,
                 'end_date': start_date + timedelta(days=days-1),
                 'people_count': people,
-                'dietary_restrictions': dietary_restrictions,
-                'meals': meal_plan['meals']
+                'dietary_restrictions': dietary_restrictions
             }
             
             meal_plan_id = self._get_repositories()['meal_plans'].create(meal_plan_data)
             meal_plan['meal_plan_id'] = meal_plan_id
+            
+            # Save meals separately
+            meal_plan_repo = self._get_repositories()['meal_plans']
+            for meal_data in meal_plan['meals']:
+                # Convert meal data to proper format and save using the repository
+                meal_date = meal_data.get('date')
+                if isinstance(meal_date, str):
+                    meal_date = datetime.strptime(meal_date, '%Y-%m-%d').date()
+                
+                meal_type_value = meal_data.get('meal_type')
+                meal_type = MealType(meal_type_value)
+                
+                meal_plan_repo.add_meal_to_plan(
+                    meal_plan_id=meal_plan_id,
+                    recipe_id=meal_data.get('recipe_id'),
+                    meal_type=meal_type,
+                    meal_date=meal_date,
+                    servings_override=meal_data.get('servings'),
+                    notes=meal_data.get('notes')
+                )
             
             return {
                 "status": "success",
@@ -433,10 +452,23 @@ class NutritionAnalysisTool(BaseTool):
                 if not recipe:
                     continue
                 
-                # Get nutritional info
-                nutrition_info = recipe.get('nutritional_info', {})
-                recipe_servings = recipe.get('servings', 1)
+                # Handle both Recipe model objects and dictionaries
+                if hasattr(recipe, 'model_dump'):
+                    # Recipe model object - convert to dict
+                    recipe_dict = recipe.model_dump()
+                elif hasattr(recipe, '__dict__'):
+                    # Regular object - convert to dict
+                    recipe_dict = recipe.__dict__
+                else:
+                    # Already a dictionary
+                    recipe_dict = recipe
                 
+                # Get nutritional info
+                nutrition_info = recipe_dict.get('nutritional_info', {})
+                if nutrition_info is None:
+                    nutrition_info = {}
+                recipe_servings = recipe_dict.get('servings', 1)
+
                 # Calculate per-serving nutrition and apply multiplier
                 per_serving_nutrition = {}
                 for nutrient, value in nutrition_info.items():
@@ -449,8 +481,8 @@ class NutritionAnalysisTool(BaseTool):
                             total_nutrition[nutrient] += adjusted_value
                 
                 analyzed_recipes.append({
-                    'recipe_id': recipe.get('id'),
-                    'recipe_name': recipe.get('name'),
+                    'recipe_id': recipe_dict.get('id'),
+                    'recipe_name': recipe_dict.get('name'),
                     'servings': recipe_servings,
                     'servings_multiplier': servings_multiplier,
                     'nutrition': per_serving_nutrition
