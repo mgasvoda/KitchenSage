@@ -19,7 +19,7 @@ interface AgentActivityPanelProps {
   planConfig: {
     days: number;
     people: number;
-    dietary_restrictions: string[];
+    prompt?: string;
     budget?: number;
   };
 }
@@ -306,7 +306,7 @@ export function AgentActivityPanel({
               </h2>
               <p className="text-sage-100 text-sm">
                 {planConfig.days} days • {planConfig.people} people
-                {planConfig.dietary_restrictions.length > 0 && ` • ${planConfig.dietary_restrictions.join(', ')}`}
+                {planConfig.prompt && planConfig.prompt.trim() && ` • ${planConfig.prompt.length > 50 ? planConfig.prompt.slice(0, 50) + '...' : planConfig.prompt}`}
               </p>
             </div>
           </div>
