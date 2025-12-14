@@ -91,16 +91,16 @@ class MealPlanService:
     
     def get_meal_plan(self, meal_plan_id: int) -> Dict[str, Any]:
         """
-        Get a meal plan by ID with full details.
-        
+        Get a meal plan by ID with full details including meals.
+
         Args:
             meal_plan_id: Meal plan ID
-            
+
         Returns:
             Dictionary with meal plan data or error
         """
         try:
-            meal_plan = self.meal_plan_repo.get_by_id(meal_plan_id)
+            meal_plan = self.meal_plan_repo.get_meal_plan_with_meals(meal_plan_id)
             
             if meal_plan is None:
                 return {

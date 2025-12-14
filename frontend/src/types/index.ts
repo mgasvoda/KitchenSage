@@ -65,11 +65,13 @@ export interface Recipe {
 // Meal Plan types
 export interface Meal {
   id: number;
+  meal_plan_id: number;
   recipe_id: number;
   recipe?: Recipe;
   meal_type: 'breakfast' | 'lunch' | 'dinner' | 'snack';
-  date: string;
-  servings: number;
+  meal_date: string;
+  servings_override?: number | null;
+  notes?: string | null;
 }
 
 export interface MealPlan {

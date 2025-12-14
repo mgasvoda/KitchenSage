@@ -33,6 +33,18 @@ KitchenSage/
 └── docs/                    # Documentation
 ```
 
+## Managing Services
+
+**IMPORTANT**: Always use the utility scripts in the root directory to manage services:
+
+```bash
+# From the root KitchenSage/ directory
+./stop.sh                         # Stop all running services (backend + frontend)
+                                  # This prevents ghost processes and orphaned ports
+```
+
+**DO NOT** use `pkill` or manual process killing - use `./stop.sh` to ensure clean shutdowns and prevent orphaned processes on ports 8000 (backend) and 5173 (frontend).
+
 ## Development Commands
 
 ### Backend (Python)

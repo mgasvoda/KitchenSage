@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { mealPlanApi } from '../services/api';
 import { AgentActivityPanel } from '../components/AgentActivityPanel';
+import { MealPlanDetailModal } from '../components/MealPlanDetailModal';
 import type { MealPlan, AgentActivityEvent } from '../types';
 
 export function CalendarPage() {
@@ -16,6 +17,7 @@ export function CalendarPage() {
     budget: undefined as number | undefined,
   });
   const [dietaryInput, setDietaryInput] = useState('');
+  const [selectedMealPlanId, setSelectedMealPlanId] = useState<number | null>(null);
   const streamRef = useRef<AsyncGenerator<AgentActivityEvent> | null>(null);
 
   useEffect(() => {
@@ -287,7 +289,8 @@ export function CalendarPage() {
               {mealPlans.map((plan) => (
                 <div
                   key={plan.id}
-                  className="bg-white rounded-xl shadow-sm border border-cream-200 p-6 hover:shadow-md transition-shadow"
+                  className="bg-white rounded-xl shadow-sm border border-cream-200 p-6 hover:shadow-lg transition-all hover:border-sage-300 cursor-pointer"
+                  onClick={() => setSelectedMealPlanId(plan.id)}
                 >
                   <h3 className="text-lg font-display font-bold text-sage-800 mb-2">
                     {plan.name || `Meal Plan #${plan.id}`}
@@ -304,11 +307,19 @@ export function CalendarPage() {
                           key={tag}
                           className="px-2 py-0.5 bg-sage-100 text-sage-700 rounded-full text-xs"
                         >
-                          {tag}
+                          {tag.replace(/_/g, ' ')}
                         </span>
                       ))}
                     </div>
                   )}
+                  <div className="mt-4 pt-4 border-t border-cream-200">
+                    <button className="text-sage-600 hover:text-sage-700 text-sm font-medium flex items-center gap-1">
+                      View Details
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -340,6 +351,15 @@ export function CalendarPage() {
         eventStream={eventStream}
         planConfig={createForm}
       />
+
+      {/* Meal Plan Detail Modal */}
+      {selectedMealPlanId && (
+        <MealPlanDetailModal
+          isOpen={selectedMealPlanId !== null}
+          onClose={() => setSelectedMealPlanId(null)}
+          mealPlanId={selectedMealPlanId}
+        />
+      )}
     </div>
   );
 }
