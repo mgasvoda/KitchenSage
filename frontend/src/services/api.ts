@@ -145,7 +145,7 @@ export const mealPlanApi = {
   create: async (params: {
     days?: number;
     people?: number;
-    dietary_restrictions?: string[];
+    prompt?: string;
     budget?: number;
   }): Promise<{ status: string; result: string }> => {
     const searchParams = new URLSearchParams();
@@ -170,7 +170,7 @@ export const mealPlanApi = {
   streamCreate: async function* (params: {
     days?: number;
     people?: number;
-    dietary_restrictions?: string[];
+    prompt?: string;
     budget?: number;
   }): AsyncGenerator<AgentActivityEvent> {
     const searchParams = new URLSearchParams();
@@ -257,8 +257,43 @@ export const groceryListApi = {
     return fetchApi(`/grocery-lists/${id}`);
   },
 
+  /**
+   * Get the default grocery list, creating one if it doesn't exist.
+   */
+  getDefault: async (): Promise<{ status: string; grocery_list: GroceryList }> => {
+    return fetchApi('/grocery-lists/default');
+  },
+
   generate: async (mealPlanId: number): Promise<{ status: string; result: string }> => {
     return fetchApi(`/grocery-lists?meal_plan_id=${mealPlanId}`, {
+      method: 'POST',
+    });
+  },
+
+  /**
+   * Add ingredients from a recipe to the grocery list.
+   */
+  addFromRecipe: async (
+    recipeId: number,
+    servings?: number
+  ): Promise<{ status: string; message: string; grocery_list: GroceryList }> => {
+    const params = new URLSearchParams();
+    params.append('recipe_id', String(recipeId));
+    if (servings !== undefined) {
+      params.append('servings', String(servings));
+    }
+    return fetchApi(`/grocery-lists/add-from-recipe?${params.toString()}`, {
+      method: 'POST',
+    });
+  },
+
+  /**
+   * Add ingredients from a meal plan to the grocery list.
+   */
+  addFromMealPlan: async (
+    mealPlanId: number
+  ): Promise<{ status: string; message: string; grocery_list: GroceryList }> => {
+    return fetchApi(`/grocery-lists/add-from-meal-plan?meal_plan_id=${mealPlanId}`, {
       method: 'POST',
     });
   },
@@ -270,6 +305,24 @@ export const groceryListApi = {
   ): Promise<{ status: string }> => {
     return fetchApi(`/grocery-lists/${listId}/items/${itemId}?checked=${checked}`, {
       method: 'PUT',
+    });
+  },
+
+  /**
+   * Clear all checked/purchased items from a grocery list.
+   */
+  clearChecked: async (listId: number): Promise<{ status: string; deleted_count: number }> => {
+    return fetchApi(`/grocery-lists/${listId}/checked`, {
+      method: 'DELETE',
+    });
+  },
+
+  /**
+   * Clear all items from a grocery list.
+   */
+  clearAll: async (listId: number): Promise<{ status: string; deleted_count: number }> => {
+    return fetchApi(`/grocery-lists/${listId}/items`, {
+      method: 'DELETE',
     });
   },
 

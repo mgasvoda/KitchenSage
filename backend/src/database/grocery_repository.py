@@ -570,4 +570,188 @@ class GroceryRepository(BaseRepository[GroceryList]):
             
         except Exception as e:
             self.logger.error(f"Error calculating grocery list statistics: {e}")
-            raise 
+            raise
+    
+    def update_item(self, item_id: int, update_data: Dict[str, Any]) -> bool:
+        """
+        Update a grocery item.
+        
+        Args:
+            item_id: ID of the grocery item
+            update_data: Dictionary of fields to update (e.g., {"purchased": True})
+            
+        Returns:
+            True if item was updated, False if not found
+        """
+        try:
+            if not update_data:
+                return False
+            
+            # Map 'checked' to 'purchased' if present (frontend compatibility)
+            if 'checked' in update_data:
+                update_data['purchased'] = update_data.pop('checked')
+            
+            with get_db_session() as conn:
+                cursor = conn.cursor()
+                
+                # Build update query
+                set_clauses = [f"{column} = ?" for column in update_data.keys()]
+                values = list(update_data.values()) + [item_id]
+                
+                query = f"""
+                    UPDATE grocery_items
+                    SET {', '.join(set_clauses)}
+                    WHERE id = ?
+                """
+                
+                cursor.execute(query, values)
+                
+                if cursor.rowcount > 0:
+                    self.logger.info(f"Updated grocery item {item_id}")
+                    return True
+                else:
+                    return False
+                    
+        except sqlite3.Error as e:
+            self.logger.error(f"Database error updating grocery item: {e}")
+            raise
+    
+    def delete_checked_items(self, grocery_list_id: int) -> int:
+        """
+        Delete all checked/purchased items from a grocery list.
+        
+        Args:
+            grocery_list_id: ID of the grocery list
+            
+        Returns:
+            Number of items deleted
+        """
+        try:
+            with get_db_session() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "DELETE FROM grocery_items WHERE grocery_list_id = ? AND purchased = 1",
+                    (grocery_list_id,)
+                )
+                deleted_count = cursor.rowcount
+                
+                if deleted_count > 0:
+                    self.logger.info(f"Deleted {deleted_count} checked items from grocery list {grocery_list_id}")
+                
+                return deleted_count
+                
+        except sqlite3.Error as e:
+            self.logger.error(f"Database error deleting checked items: {e}")
+            raise
+    
+    def delete_all_items(self, grocery_list_id: int) -> int:
+        """
+        Delete all items from a grocery list.
+        
+        Args:
+            grocery_list_id: ID of the grocery list
+            
+        Returns:
+            Number of items deleted
+        """
+        try:
+            with get_db_session() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "DELETE FROM grocery_items WHERE grocery_list_id = ?",
+                    (grocery_list_id,)
+                )
+                deleted_count = cursor.rowcount
+                
+                if deleted_count > 0:
+                    self.logger.info(f"Deleted all {deleted_count} items from grocery list {grocery_list_id}")
+                
+                return deleted_count
+                
+        except sqlite3.Error as e:
+            self.logger.error(f"Database error deleting all items: {e}")
+            raise
+    
+    def get_or_create_default_list(self) -> GroceryList:
+        """
+        Get the default grocery list, or create one if it doesn't exist.
+        
+        Since we only support a single grocery list, this returns the first
+        list found or creates a new one.
+        
+        Returns:
+            GroceryList instance
+        """
+        try:
+            # Try to get existing list
+            lists = self.get_all(limit=1)
+            if lists:
+                return self.get_grocery_list_with_items(lists[0].id)
+            
+            # Create new default list
+            grocery_list_create = GroceryListCreate(
+                name="My Grocery List",
+                meal_plan_id=None,
+                budget_limit=None
+            )
+            
+            return self.create_grocery_list(grocery_list_create)
+            
+        except Exception as e:
+            self.logger.error(f"Error getting or creating default grocery list: {e}")
+            raise
+    
+    def add_or_merge_item(
+        self,
+        grocery_list_id: int,
+        ingredient_id: int,
+        quantity: float,
+        unit: str
+    ) -> bool:
+        """
+        Add an item to a grocery list, merging quantity if the ingredient already exists.
+        
+        Args:
+            grocery_list_id: ID of the grocery list
+            ingredient_id: ID of the ingredient
+            quantity: Quantity to add
+            unit: Unit of measurement
+            
+        Returns:
+            True if item was added/updated successfully
+        """
+        try:
+            with get_db_session() as conn:
+                cursor = conn.cursor()
+                
+                # Check if item already exists with same ingredient and unit
+                cursor.execute("""
+                    SELECT id, quantity FROM grocery_items
+                    WHERE grocery_list_id = ? AND ingredient_id = ? AND unit = ?
+                """, (grocery_list_id, ingredient_id, unit))
+                
+                existing = cursor.fetchone()
+                
+                if existing:
+                    # Merge: add to existing quantity
+                    new_quantity = existing['quantity'] + quantity
+                    cursor.execute("""
+                        UPDATE grocery_items
+                        SET quantity = ?, purchased = 0
+                        WHERE id = ?
+                    """, (new_quantity, existing['id']))
+                    self.logger.info(f"Merged item {ingredient_id} in list {grocery_list_id}: quantity now {new_quantity}")
+                else:
+                    # Insert new item
+                    cursor.execute("""
+                        INSERT INTO grocery_items 
+                        (grocery_list_id, ingredient_id, quantity, unit, purchased)
+                        VALUES (?, ?, ?, ?, 0)
+                    """, (grocery_list_id, ingredient_id, quantity, unit))
+                    self.logger.info(f"Added new item {ingredient_id} to list {grocery_list_id}")
+                
+                return True
+                
+        except sqlite3.Error as e:
+            self.logger.error(f"Database error adding/merging item: {e}")
+            raise

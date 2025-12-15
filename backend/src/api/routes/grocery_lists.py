@@ -25,6 +25,23 @@ async def list_grocery_lists(
     return result
 
 
+@router.get("/default", response_model=dict)
+async def get_default_grocery_list():
+    """
+    Get the default grocery list, creating one if it doesn't exist.
+    
+    Since the app uses a single grocery list, this endpoint returns
+    that list or creates it if needed.
+    """
+    service = GroceryService()
+    result = service.get_or_create_default_list()
+    
+    if result.get("status") == "error":
+        raise HTTPException(status_code=500, detail=result.get("message", "Failed to get grocery list"))
+    
+    return result
+
+
 @router.get("/{grocery_list_id}", response_model=dict)
 async def get_grocery_list(grocery_list_id: int):
     """
@@ -85,6 +102,75 @@ async def delete_grocery_list(grocery_list_id: int):
     """
     service = GroceryService()
     result = service.delete_grocery_list(grocery_list_id)
+    
+    if result.get("status") == "error":
+        raise HTTPException(status_code=404, detail=result.get("message", "Grocery list not found"))
+    
+    return result
+
+
+@router.post("/add-from-recipe", response_model=dict)
+async def add_from_recipe(
+    recipe_id: int = Query(..., description="Recipe ID to add ingredients from"),
+    servings: Optional[int] = Query(None, description="Number of servings (uses recipe default if not provided)"),
+):
+    """
+    Add ingredients from a recipe to the grocery list.
+    
+    Gets or creates the default grocery list, then merges recipe
+    ingredients into it. If ingredients already exist, quantities
+    are combined.
+    """
+    service = GroceryService()
+    result = service.add_recipe_ingredients(recipe_id=recipe_id, servings=servings)
+    
+    if result.get("status") == "error":
+        raise HTTPException(status_code=400, detail=result.get("message", "Failed to add recipe ingredients"))
+    
+    return result
+
+
+@router.post("/add-from-meal-plan", response_model=dict)
+async def add_from_meal_plan(
+    meal_plan_id: int = Query(..., description="Meal plan ID to add ingredients from"),
+):
+    """
+    Add all ingredients from a meal plan to the grocery list.
+    
+    Gets or creates the default grocery list, then merges all
+    recipe ingredients from the meal plan into it. Quantities
+    are adjusted for servings and combined for duplicate ingredients.
+    """
+    service = GroceryService()
+    result = service.add_meal_plan_ingredients(meal_plan_id=meal_plan_id)
+    
+    if result.get("status") == "error":
+        raise HTTPException(status_code=400, detail=result.get("message", "Failed to add meal plan ingredients"))
+    
+    return result
+
+
+@router.delete("/{grocery_list_id}/checked", response_model=dict)
+async def clear_checked_items(grocery_list_id: int):
+    """
+    Remove all checked/purchased items from a grocery list.
+    """
+    service = GroceryService()
+    result = service.clear_checked_items(grocery_list_id)
+    
+    if result.get("status") == "error":
+        raise HTTPException(status_code=404, detail=result.get("message", "Grocery list not found"))
+    
+    return result
+
+
+@router.delete("/{grocery_list_id}/items", response_model=dict)
+async def clear_all_items(grocery_list_id: int):
+    """
+    Remove all items from a grocery list.
+    """
+    service = GroceryService()
+    result = service.clear_all_items(grocery_list_id)
     
     if result.get("status") == "error":
         raise HTTPException(status_code=404, detail=result.get("message", "Grocery list not found"))

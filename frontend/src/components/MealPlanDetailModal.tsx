@@ -5,7 +5,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { mealPlanApi } from '../services/api';
+import { mealPlanApi, groceryListApi } from '../services/api';
 import type { MealPlan, Meal } from '../types';
 
 interface MealPlanDetailModalProps {
@@ -22,6 +22,8 @@ export function MealPlanDetailModal({
   const [mealPlan, setMealPlan] = useState<MealPlan | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [generatingGroceryList, setGeneratingGroceryList] = useState(false);
+  const [groceryMessage, setGroceryMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   useEffect(() => {
     if (isOpen && mealPlanId) {
@@ -87,6 +89,26 @@ export function MealPlanDetailModal({
 
   const capitalizeFirst = (str: string) => {
     return str.charAt(0).toUpperCase() + str.slice(1);
+  };
+
+  const handleGenerateGroceryList = async () => {
+    if (!mealPlan) return;
+    
+    try {
+      setGeneratingGroceryList(true);
+      setGroceryMessage(null);
+      const response = await groceryListApi.addFromMealPlan(mealPlan.id);
+      setGroceryMessage({ type: 'success', text: response.message || 'Added to grocery list!' });
+      // Clear message after 3 seconds
+      setTimeout(() => setGroceryMessage(null), 3000);
+    } catch (err) {
+      setGroceryMessage({ 
+        type: 'error', 
+        text: err instanceof Error ? err.message : 'Failed to generate grocery list' 
+      });
+    } finally {
+      setGeneratingGroceryList(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -241,24 +263,42 @@ export function MealPlanDetailModal({
         </div>
 
         {/* Footer */}
-        <div className="bg-cream-50 px-6 py-4 border-t border-cream-200 flex justify-end gap-3">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 bg-white border border-cream-300 text-sage-700 rounded-lg hover:bg-cream-100 transition-colors font-medium"
-          >
-            Close
-          </button>
-          {mealPlan && (
-            <button
-              className="px-4 py-2 bg-sage-600 text-white rounded-lg hover:bg-sage-700 transition-colors font-medium"
-              onClick={() => {
-                // TODO: Add grocery list generation
-                console.log('Generate grocery list for plan:', mealPlan.id);
-              }}
-            >
-              Generate Grocery List
-            </button>
+        <div className="bg-cream-50 px-6 py-4 border-t border-cream-200">
+          {/* Grocery List Feedback */}
+          {groceryMessage && (
+            <div className={`mb-4 p-3 rounded-lg ${
+              groceryMessage.type === 'success' 
+                ? 'bg-green-50 text-green-700 border border-green-200' 
+                : 'bg-red-50 text-red-700 border border-red-200'
+            }`}>
+              {groceryMessage.text}
+            </div>
           )}
+          
+          <div className="flex justify-end gap-3">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 bg-white border border-cream-300 text-sage-700 rounded-lg hover:bg-cream-100 transition-colors font-medium"
+            >
+              Close
+            </button>
+            {mealPlan && (
+              <button
+                onClick={handleGenerateGroceryList}
+                disabled={generatingGroceryList}
+                className="px-4 py-2 bg-sage-600 text-white rounded-lg hover:bg-sage-700 transition-colors font-medium disabled:opacity-50 flex items-center gap-2"
+              >
+                {generatingGroceryList ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                ) : (
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                  </svg>
+                )}
+                Add to Grocery List
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>

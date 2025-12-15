@@ -5,7 +5,7 @@ Grocery service - business logic layer for grocery list operations.
 import logging
 from typing import Optional, Dict, Any
 
-from src.database import GroceryRepository, DatabaseError, RecordNotFoundError
+from src.database import GroceryRepository, RecipeRepository, MealPlanRepository, DatabaseError, RecordNotFoundError
 from src.crew import KitchenCrew
 
 logger = logging.getLogger(__name__)
@@ -21,6 +21,8 @@ class GroceryService:
     
     def __init__(self):
         self._grocery_repo = None
+        self._recipe_repo = None
+        self._meal_plan_repo = None
         self._kitchen_crew = None
     
     @property
@@ -29,6 +31,20 @@ class GroceryService:
         if self._grocery_repo is None:
             self._grocery_repo = GroceryRepository()
         return self._grocery_repo
+    
+    @property
+    def recipe_repo(self) -> RecipeRepository:
+        """Lazy initialization of recipe repository."""
+        if self._recipe_repo is None:
+            self._recipe_repo = RecipeRepository()
+        return self._recipe_repo
+    
+    @property
+    def meal_plan_repo(self) -> MealPlanRepository:
+        """Lazy initialization of meal plan repository."""
+        if self._meal_plan_repo is None:
+            self._meal_plan_repo = MealPlanRepository()
+        return self._meal_plan_repo
     
     @property
     def kitchen_crew(self) -> KitchenCrew:
@@ -233,6 +249,237 @@ class GroceryService:
                 
         except Exception as e:
             logger.error(f"Error deleting grocery list {grocery_list_id}: {e}")
+            return {
+                "status": "error",
+                "message": str(e),
+            }
+    
+    def get_or_create_default_list(self) -> Dict[str, Any]:
+        """
+        Get the default grocery list, creating one if it doesn't exist.
+        
+        Returns:
+            Dictionary with grocery list data
+        """
+        try:
+            grocery_list = self.grocery_repo.get_or_create_default_list()
+            list_dict = grocery_list.model_dump() if hasattr(grocery_list, 'model_dump') else dict(grocery_list)
+            
+            return {
+                "status": "success",
+                "grocery_list": list_dict,
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting/creating default grocery list: {e}")
+            return {
+                "status": "error",
+                "message": str(e),
+            }
+    
+    def add_recipe_ingredients(
+        self,
+        recipe_id: int,
+        servings: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """
+        Add ingredients from a recipe to the grocery list.
+        
+        Gets or creates the default grocery list, then merges recipe
+        ingredients into it.
+        
+        Args:
+            recipe_id: ID of the recipe
+            servings: Number of servings (uses recipe default if not provided)
+            
+        Returns:
+            Dictionary with result and updated grocery list
+        """
+        try:
+            # Get the recipe with ingredients
+            recipe = self.recipe_repo.get_recipe_with_ingredients(recipe_id)
+            if not recipe:
+                return {
+                    "status": "error",
+                    "message": f"Recipe with ID {recipe_id} not found",
+                }
+            
+            # Get or create the grocery list
+            grocery_list = self.grocery_repo.get_or_create_default_list()
+            
+            # Calculate serving multiplier
+            recipe_servings = recipe.servings or 1
+            target_servings = servings or recipe_servings
+            multiplier = target_servings / recipe_servings
+            
+            # Add each ingredient to the list
+            items_added = 0
+            for recipe_ingredient in recipe.ingredients:
+                if not recipe_ingredient.ingredient_id:
+                    continue
+                
+                adjusted_quantity = recipe_ingredient.quantity * multiplier
+                unit_value = recipe_ingredient.unit.value if hasattr(recipe_ingredient.unit, 'value') else str(recipe_ingredient.unit)
+                
+                self.grocery_repo.add_or_merge_item(
+                    grocery_list_id=grocery_list.id,
+                    ingredient_id=recipe_ingredient.ingredient_id,
+                    quantity=adjusted_quantity,
+                    unit=unit_value
+                )
+                items_added += 1
+            
+            # Get updated list
+            updated_list = self.grocery_repo.get_or_create_default_list()
+            list_dict = updated_list.model_dump() if hasattr(updated_list, 'model_dump') else dict(updated_list)
+            
+            return {
+                "status": "success",
+                "message": f"Added {items_added} ingredients from '{recipe.name}' to grocery list",
+                "grocery_list": list_dict,
+            }
+            
+        except Exception as e:
+            logger.error(f"Error adding recipe ingredients: {e}")
+            return {
+                "status": "error",
+                "message": str(e),
+            }
+    
+    def add_meal_plan_ingredients(self, meal_plan_id: int) -> Dict[str, Any]:
+        """
+        Add all ingredients from a meal plan to the grocery list.
+        
+        Gets or creates the default grocery list, then merges all
+        recipe ingredients from the meal plan into it.
+        
+        Args:
+            meal_plan_id: ID of the meal plan
+            
+        Returns:
+            Dictionary with result and updated grocery list
+        """
+        try:
+            # Get the meal plan with meals and recipes
+            meal_plan = self.meal_plan_repo.get_meal_plan_with_meals(meal_plan_id)
+            if not meal_plan:
+                return {
+                    "status": "error",
+                    "message": f"Meal plan with ID {meal_plan_id} not found",
+                }
+            
+            # Get or create the grocery list
+            grocery_list = self.grocery_repo.get_or_create_default_list()
+            
+            # Track items added
+            items_added = 0
+            
+            # Process each meal
+            for meal in meal_plan.meals:
+                if not meal.recipe or not meal.recipe.ingredients:
+                    continue
+                
+                # Calculate serving multiplier for this meal
+                effective_servings = meal.get_effective_servings() if hasattr(meal, 'get_effective_servings') else (meal.servings_override or meal.recipe.servings)
+                recipe_servings = meal.recipe.servings or 1
+                multiplier = effective_servings / recipe_servings
+                
+                # Add each ingredient
+                for recipe_ingredient in meal.recipe.ingredients:
+                    if not recipe_ingredient.ingredient_id:
+                        continue
+                    
+                    adjusted_quantity = recipe_ingredient.quantity * multiplier
+                    unit_value = recipe_ingredient.unit.value if hasattr(recipe_ingredient.unit, 'value') else str(recipe_ingredient.unit)
+                    
+                    self.grocery_repo.add_or_merge_item(
+                        grocery_list_id=grocery_list.id,
+                        ingredient_id=recipe_ingredient.ingredient_id,
+                        quantity=adjusted_quantity,
+                        unit=unit_value
+                    )
+                    items_added += 1
+            
+            # Get updated list
+            updated_list = self.grocery_repo.get_or_create_default_list()
+            list_dict = updated_list.model_dump() if hasattr(updated_list, 'model_dump') else dict(updated_list)
+            
+            return {
+                "status": "success",
+                "message": f"Added {items_added} ingredients from meal plan '{meal_plan.name}' to grocery list",
+                "grocery_list": list_dict,
+            }
+            
+        except Exception as e:
+            logger.error(f"Error adding meal plan ingredients: {e}")
+            return {
+                "status": "error",
+                "message": str(e),
+            }
+    
+    def clear_checked_items(self, grocery_list_id: int) -> Dict[str, Any]:
+        """
+        Remove all checked/purchased items from a grocery list.
+        
+        Args:
+            grocery_list_id: ID of the grocery list
+            
+        Returns:
+            Dictionary with result
+        """
+        try:
+            # Verify list exists
+            grocery_list = self.grocery_repo.get_by_id(grocery_list_id)
+            if grocery_list is None:
+                return {
+                    "status": "error",
+                    "message": f"Grocery list with ID {grocery_list_id} not found",
+                }
+            
+            deleted_count = self.grocery_repo.delete_checked_items(grocery_list_id)
+            
+            return {
+                "status": "success",
+                "message": f"Removed {deleted_count} checked items",
+                "deleted_count": deleted_count,
+            }
+            
+        except Exception as e:
+            logger.error(f"Error clearing checked items: {e}")
+            return {
+                "status": "error",
+                "message": str(e),
+            }
+    
+    def clear_all_items(self, grocery_list_id: int) -> Dict[str, Any]:
+        """
+        Remove all items from a grocery list.
+        
+        Args:
+            grocery_list_id: ID of the grocery list
+            
+        Returns:
+            Dictionary with result
+        """
+        try:
+            # Verify list exists
+            grocery_list = self.grocery_repo.get_by_id(grocery_list_id)
+            if grocery_list is None:
+                return {
+                    "status": "error",
+                    "message": f"Grocery list with ID {grocery_list_id} not found",
+                }
+            
+            deleted_count = self.grocery_repo.delete_all_items(grocery_list_id)
+            
+            return {
+                "status": "success",
+                "message": f"Removed all {deleted_count} items from list",
+                "deleted_count": deleted_count,
+            }
+            
+        except Exception as e:
+            logger.error(f"Error clearing all items: {e}")
             return {
                 "status": "error",
                 "message": str(e),

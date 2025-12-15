@@ -3,42 +3,76 @@ import { groceryListApi } from '../services/api';
 import type { GroceryList, GroceryItem } from '../types';
 
 export function GroceryPage() {
-  const [groceryLists, setGroceryLists] = useState<GroceryList[]>([]);
-  const [selectedList, setSelectedList] = useState<GroceryList | null>(null);
+  const [groceryList, setGroceryList] = useState<GroceryList | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [showClearAllConfirm, setShowClearAllConfirm] = useState(false);
 
   useEffect(() => {
-    loadGroceryLists();
+    loadGroceryList();
   }, []);
 
-  const loadGroceryLists = async () => {
+  const loadGroceryList = async () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await groceryListApi.list({ limit: 50 });
-      setGroceryLists(response.grocery_lists || []);
+      const response = await groceryListApi.getDefault();
+      setGroceryList(response.grocery_list || null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load grocery lists');
+      setError(err instanceof Error ? err.message : 'Failed to load grocery list');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleToggleItem = async (listId: number, itemId: number, checked: boolean) => {
+  const handleToggleItem = async (itemId: number, checked: boolean) => {
+    if (!groceryList) return;
+    
     try {
-      await groceryListApi.updateItem(listId, itemId, checked);
+      await groceryListApi.updateItem(groceryList.id, itemId, checked);
       // Update local state
-      if (selectedList) {
-        setSelectedList({
-          ...selectedList,
-          items: selectedList.items.map(item =>
-            item.id === itemId ? { ...item, checked } : item
-          ),
-        });
-      }
+      setGroceryList({
+        ...groceryList,
+        items: groceryList.items.map(item =>
+          item.id === itemId ? { ...item, checked } : item
+        ),
+      });
     } catch (err) {
       console.error('Failed to update item:', err);
+    }
+  };
+
+  const handleClearChecked = async () => {
+    if (!groceryList) return;
+    
+    try {
+      setActionLoading('clearChecked');
+      await groceryListApi.clearChecked(groceryList.id);
+      // Reload the list to get updated items
+      await loadGroceryList();
+    } catch (err) {
+      console.error('Failed to clear checked items:', err);
+      setError(err instanceof Error ? err.message : 'Failed to clear checked items');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleClearAll = async () => {
+    if (!groceryList) return;
+    
+    try {
+      setActionLoading('clearAll');
+      setShowClearAllConfirm(false);
+      await groceryListApi.clearAll(groceryList.id);
+      // Reload the list to get updated items
+      await loadGroceryList();
+    } catch (err) {
+      console.error('Failed to clear all items:', err);
+      setError(err instanceof Error ? err.message : 'Failed to clear all items');
+    } finally {
+      setActionLoading(null);
     }
   };
 
@@ -68,10 +102,23 @@ export function GroceryPage() {
         return '🥫';
       case 'beverages':
         return '🥤';
+      case 'seafood':
+        return '🐟';
+      case 'grains':
+        return '🌾';
+      case 'spices':
+        return '🧂';
+      case 'condiments':
+        return '🍯';
       default:
         return '📦';
     }
   };
+
+  const checkedCount = groceryList?.items?.filter(i => i.checked).length || 0;
+  const totalCount = groceryList?.items?.length || 0;
+  const hasCheckedItems = checkedCount > 0;
+  const hasItems = totalCount > 0;
 
   return (
     <div className="min-h-screen bg-cream-50">
@@ -79,11 +126,48 @@ export function GroceryPage() {
       <header className="bg-white border-b border-cream-300 px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-display font-bold text-sage-800">Grocery Lists</h1>
+            <h1 className="text-2xl font-display font-bold text-sage-800">Grocery List</h1>
             <p className="text-sage-600 text-sm mt-1">
-              Manage your shopping lists
+              {hasItems ? `${checkedCount} of ${totalCount} items checked` : 'Your shopping list'}
             </p>
           </div>
+          
+          {/* Action Buttons */}
+          {hasItems && (
+            <div className="flex items-center gap-3">
+              {hasCheckedItems && (
+                <button
+                  onClick={handleClearChecked}
+                  disabled={actionLoading !== null}
+                  className="px-4 py-2 bg-white border border-cream-300 text-sage-700 rounded-lg hover:bg-cream-100 transition-colors font-medium text-sm disabled:opacity-50 flex items-center gap-2"
+                >
+                  {actionLoading === 'clearChecked' ? (
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-sage-600 border-t-transparent"></div>
+                  ) : (
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  )}
+                  Clear Checked
+                </button>
+              )}
+              
+              <button
+                onClick={() => setShowClearAllConfirm(true)}
+                disabled={actionLoading !== null}
+                className="px-4 py-2 bg-white border border-red-200 text-red-600 rounded-lg hover:bg-red-50 transition-colors font-medium text-sm disabled:opacity-50 flex items-center gap-2"
+              >
+                {actionLoading === 'clearAll' ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-red-600 border-t-transparent"></div>
+                ) : (
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                )}
+                Clear All
+              </button>
+            </div>
+          )}
         </div>
       </header>
 
@@ -98,10 +182,17 @@ export function GroceryPage() {
         {error && (
           <div className="bg-red-50 text-red-700 p-4 rounded-lg mb-4">
             {error}
+            <button 
+              onClick={() => setError(null)} 
+              className="ml-2 text-red-500 hover:text-red-700"
+            >
+              ×
+            </button>
           </div>
         )}
 
-        {!loading && groceryLists.length === 0 && !selectedList && (
+        {/* Empty State */}
+        {!loading && !hasItems && (
           <div className="text-center py-12">
             <div className="w-20 h-20 bg-sage-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <svg className="w-10 h-10 text-sage-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -110,36 +201,41 @@ export function GroceryPage() {
               </svg>
             </div>
             <h2 className="text-xl font-display font-bold text-sage-800 mb-2">
-              No grocery lists yet
+              Your grocery list is empty
             </h2>
-            <p className="text-sage-600 mb-4">
-              Create a meal plan first, then generate a grocery list from it.
+            <p className="text-sage-600 mb-4 max-w-md mx-auto">
+              Add ingredients from your recipes or generate a list from a meal plan to get started.
             </p>
-            
-            {/* Demo grocery list for display */}
-            <div className="max-w-md mx-auto bg-white rounded-xl shadow-sm border border-cream-200 p-6 text-left mt-8">
-              <h3 className="text-lg font-display font-bold text-sage-800 mb-4">
-                Sample Grocery List
-              </h3>
-              <div className="space-y-4">
-                {[
-                  { category: 'Produce', items: ['Tomatoes', 'Onions', 'Garlic'] },
-                  { category: 'Protein', items: ['Chicken breast', 'Salmon'] },
-                  { category: 'Dairy', items: ['Milk', 'Cheese'] },
-                ].map((group) => (
-                  <div key={group.category}>
-                    <h4 className="text-sm font-medium text-sage-600 mb-2 flex items-center gap-2">
-                      <span>{getCategoryIcon(group.category)}</span>
-                      {group.category}
-                    </h4>
+          </div>
+        )}
+
+        {/* Grocery List Items */}
+        {!loading && groceryList && hasItems && (
+          <div className="max-w-2xl mx-auto">
+            <div className="bg-white rounded-xl shadow-sm border border-cream-200 p-6">
+              <div className="space-y-6">
+                {Object.entries(groupItemsByCategory(groceryList.items)).map(([category, items]) => (
+                  <div key={category}>
+                    <h3 className="text-sm font-medium text-sage-600 mb-3 flex items-center gap-2 border-b border-cream-200 pb-2">
+                      <span>{getCategoryIcon(category)}</span>
+                      {category}
+                      <span className="text-sage-400 font-normal">({items.length})</span>
+                    </h3>
                     <ul className="space-y-2">
-                      {group.items.map((item) => (
-                        <li key={item} className="flex items-center gap-3">
+                      {items.map((item) => (
+                        <li key={item.id} className="flex items-center gap-3 group">
                           <input
                             type="checkbox"
-                            className="w-5 h-5 rounded border-cream-300 text-sage-600 focus:ring-sage-500"
+                            checked={item.checked}
+                            onChange={(e) => handleToggleItem(item.id, e.target.checked)}
+                            className="w-5 h-5 rounded border-cream-300 text-sage-600 focus:ring-sage-500 cursor-pointer"
                           />
-                          <span className="text-sage-700">{item}</span>
+                          <span className={`flex-1 transition-colors ${item.checked ? 'line-through text-sage-400' : 'text-sage-700'}`}>
+                            {item.ingredient_name}
+                          </span>
+                          <span className={`text-sm transition-colors ${item.checked ? 'text-sage-300' : 'text-sage-500'}`}>
+                            {item.quantity} {item.unit}
+                          </span>
                         </li>
                       ))}
                     </ul>
@@ -149,99 +245,35 @@ export function GroceryPage() {
             </div>
           </div>
         )}
+      </div>
 
-        {/* Grocery Lists Grid */}
-        {!selectedList && groceryLists.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {groceryLists.map((list) => (
-              <div
-                key={list.id}
-                onClick={() => setSelectedList(list)}
-                className="bg-white rounded-xl shadow-sm border border-cream-200 p-6 hover:shadow-md transition-shadow cursor-pointer"
+      {/* Clear All Confirmation Modal */}
+      {showClearAllConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6">
+            <h3 className="text-lg font-display font-bold text-sage-800 mb-2">
+              Clear All Items?
+            </h3>
+            <p className="text-sage-600 mb-6">
+              This will remove all {totalCount} items from your grocery list. This action cannot be undone.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setShowClearAllConfirm(false)}
+                className="px-4 py-2 bg-white border border-cream-300 text-sage-700 rounded-lg hover:bg-cream-100 transition-colors font-medium"
               >
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-display font-bold text-sage-800">
-                    Grocery List #{list.id}
-                  </h3>
-                  {list.completed && (
-                    <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">
-                      Completed
-                    </span>
-                  )}
-                </div>
-                <p className="text-sage-600 text-sm mb-2">
-                  {list.items?.length || 0} items
-                </p>
-                {list.estimated_cost && (
-                  <p className="text-terracotta-600 font-medium">
-                    Est. ${list.estimated_cost.toFixed(2)}
-                  </p>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Selected List Detail */}
-        {selectedList && (
-          <div className="max-w-2xl mx-auto">
-            <button
-              onClick={() => setSelectedList(null)}
-              className="flex items-center gap-2 text-sage-600 hover:text-sage-800 mb-4"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-              Back to lists
-            </button>
-
-            <div className="bg-white rounded-xl shadow-sm border border-cream-200 p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-display font-bold text-sage-800">
-                  Grocery List #{selectedList.id}
-                </h2>
-                <div className="text-sm text-sage-600">
-                  {selectedList.items?.filter(i => i.checked).length || 0} / {selectedList.items?.length || 0} items
-                </div>
-              </div>
-
-              {selectedList.items && selectedList.items.length > 0 ? (
-                <div className="space-y-6">
-                  {Object.entries(groupItemsByCategory(selectedList.items)).map(([category, items]) => (
-                    <div key={category}>
-                      <h3 className="text-sm font-medium text-sage-600 mb-3 flex items-center gap-2 border-b border-cream-200 pb-2">
-                        <span>{getCategoryIcon(category)}</span>
-                        {category}
-                      </h3>
-                      <ul className="space-y-2">
-                        {items.map((item) => (
-                          <li key={item.id} className="flex items-center gap-3">
-                            <input
-                              type="checkbox"
-                              checked={item.checked}
-                              onChange={(e) => handleToggleItem(selectedList.id, item.id, e.target.checked)}
-                              className="w-5 h-5 rounded border-cream-300 text-sage-600 focus:ring-sage-500"
-                            />
-                            <span className={`flex-1 ${item.checked ? 'line-through text-sage-400' : 'text-sage-700'}`}>
-                              {item.ingredient_name}
-                            </span>
-                            <span className="text-sm text-sage-500">
-                              {item.quantity} {item.unit}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sage-600 text-center py-4">No items in this list</p>
-              )}
+                Cancel
+              </button>
+              <button
+                onClick={handleClearAll}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
+              >
+                Clear All
+              </button>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
-
