@@ -13,10 +13,9 @@ export function CalendarPage() {
   const [createForm, setCreateForm] = useState({
     days: 7,
     people: 2,
-    dietary_restrictions: [] as string[],
+    prompt: '',
     budget: undefined as number | undefined,
   });
-  const [dietaryInput, setDietaryInput] = useState('');
   const [selectedMealPlanId, setSelectedMealPlanId] = useState<number | null>(null);
   const streamRef = useRef<AsyncGenerator<AgentActivityEvent> | null>(null);
 
@@ -48,32 +47,13 @@ export function CalendarPage() {
   const handlePanelComplete = async (mealPlan: string) => {
     // Reload meal plans after completion
     await loadMealPlans();
-    setCreateForm({ days: 7, people: 2, dietary_restrictions: [], budget: undefined });
-    setDietaryInput('');
+    setCreateForm({ days: 7, people: 2, prompt: '', budget: undefined });
   };
 
   const handlePanelClose = () => {
     setShowCreatePanel(false);
     setEventStream(null);
     streamRef.current = null;
-  };
-
-  const addDietaryRestriction = () => {
-    const trimmed = dietaryInput.trim();
-    if (trimmed && !createForm.dietary_restrictions.includes(trimmed)) {
-      setCreateForm({
-        ...createForm,
-        dietary_restrictions: [...createForm.dietary_restrictions, trimmed],
-      });
-      setDietaryInput('');
-    }
-  };
-
-  const removeDietaryRestriction = (restriction: string) => {
-    setCreateForm({
-      ...createForm,
-      dietary_restrictions: createForm.dietary_restrictions.filter(r => r !== restriction),
-    });
   };
 
   // Generate week days for display
@@ -187,46 +167,18 @@ export function CalendarPage() {
             </div>
           </div>
 
-          {/* Dietary Restrictions */}
+          {/* Preferences Prompt */}
           <div className="mb-6">
             <label className="block text-sm font-medium text-sage-100 mb-2">
-              Dietary Restrictions
+              Preferences & Instructions
             </label>
-            <div className="flex gap-2 mb-2">
-              <input
-                type="text"
-                value={dietaryInput}
-                onChange={(e) => setDietaryInput(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addDietaryRestriction())}
-                placeholder="e.g., vegetarian, gluten-free"
-                className="flex-1 px-4 py-2.5 bg-white/10 border border-white/20 rounded-lg text-white placeholder-sage-300 focus:outline-none focus:ring-2 focus:ring-white/30"
-              />
-              <button
-                type="button"
-                onClick={addDietaryRestriction}
-                className="px-4 py-2.5 bg-white/20 hover:bg-white/30 rounded-lg font-medium transition-colors"
-              >
-                Add
-              </button>
-            </div>
-            {createForm.dietary_restrictions.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {createForm.dietary_restrictions.map((restriction) => (
-                  <span
-                    key={restriction}
-                    className="inline-flex items-center gap-1 px-3 py-1 bg-white/20 rounded-full text-sm"
-                  >
-                    {restriction}
-                    <button
-                      onClick={() => removeDietaryRestriction(restriction)}
-                      className="ml-1 hover:text-terracotta-200"
-                    >
-                      ×
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
+            <textarea
+              value={createForm.prompt}
+              onChange={(e) => setCreateForm({ ...createForm, prompt: e.target.value })}
+              placeholder="Tell us about your preferences... e.g., 'vegetarian meals with Italian cuisine focus', 'quick weeknight dinners under 30 minutes', 'high protein, low carb for weight loss', 'kid-friendly meals my picky eater will love'"
+              rows={3}
+              className="w-full px-4 py-2.5 bg-white/10 border border-white/20 rounded-lg text-white placeholder-sage-300 focus:outline-none focus:ring-2 focus:ring-white/30 resize-none"
+            />
           </div>
 
           <button

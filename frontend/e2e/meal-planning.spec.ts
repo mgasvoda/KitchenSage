@@ -35,7 +35,7 @@ test.describe('Meal Planning', () => {
       await expect(page.getByRole('heading', { name: 'Meal Planning' })).toBeVisible();
 
       // Check create button
-      await expect(page.getByRole('button', { name: 'Create Plan' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Generate AI Meal Plan' })).toBeVisible();
 
       // Check week view grid is present
       await expect(page.locator('.grid.grid-cols-7').first()).toBeVisible();
@@ -64,12 +64,12 @@ test.describe('Meal Planning', () => {
 
       // Check empty state message
       await expect(page.getByText(/No meal plans yet/)).toBeVisible();
-      await expect(page.getByText(/Use the "Create Plan" button/)).toBeVisible();
+      await expect(page.getByText(/Use the form above to create/)).toBeVisible();
     });
   });
 
   test.describe('Meal Plan Creation', () => {
-    test('opens and closes create modal', async ({ page }) => {
+    test('displays create form with all fields', async ({ page }) => {
       await page.route('**/api/meal-plans*', async route => {
         await route.fulfill({
           status: 200,
@@ -86,24 +86,14 @@ test.describe('Meal Planning', () => {
 
       await page.goto('/calendar');
 
-      // Open modal
-      const createButton = page.getByRole('button', { name: 'Create Plan' });
-      await createButton.click();
-
-      // Check modal is visible
-      await expect(page.getByRole('heading', { name: 'Create Meal Plan' })).toBeVisible();
-
-      // Check form fields
-      await expect(page.locator('label:has-text("Number of Days")')).toBeVisible();
-      await expect(page.locator('label:has-text("Number of People")')).toBeVisible();
+      // Check form fields are visible (inline form, not modal)
+      await expect(page.locator('label:has-text("Days")')).toBeVisible();
+      await expect(page.locator('label:has-text("People")')).toBeVisible();
       await expect(page.locator('label:has-text("Budget")')).toBeVisible();
+      await expect(page.locator('label:has-text("Preferences & Instructions")')).toBeVisible();
 
-      // Close modal by clicking X button
-      const closeButton = page.locator('button:has(svg)').filter({ has: page.locator('path[d*="M6 18L18 6"]') });
-      await closeButton.click();
-
-      // Check modal is closed
-      await expect(page.getByRole('heading', { name: 'Create Meal Plan' })).not.toBeVisible();
+      // Check create button
+      await expect(page.getByRole('button', { name: 'Generate AI Meal Plan' })).toBeVisible();
     });
 
     test('creates meal plan successfully', async ({ page }) => {
@@ -124,7 +114,7 @@ test.describe('Meal Planning', () => {
                   start_date: '2025-12-14',
                   end_date: '2025-12-20',
                   people_count: 2,
-                  dietary_restrictions: ['vegetarian'],
+                  dietary_restrictions: [],
                   meals: [
                     {
                       id: 1,
@@ -157,7 +147,7 @@ test.describe('Meal Planning', () => {
                 start_date: '2025-12-14',
                 end_date: '2025-12-20',
                 people_count: postData.people || 2,
-                dietary_restrictions: postData.dietary_restrictions || [],
+                dietary_restrictions: [],
                 meals: []
               }
             })
@@ -167,28 +157,22 @@ test.describe('Meal Planning', () => {
 
       await page.goto('/calendar');
 
-      // Open modal
-      await page.getByRole('button', { name: 'Create Plan' }).click();
-
-      // Fill form
-      const daysInput = page.locator('input[type="number"]').first();
+      // Fill form (inline form, not modal)
+      const daysInput = page.locator('label:has-text("Days")').locator('..').locator('input[type="number"]').first();
       await daysInput.fill('7');
 
-      const peopleInput = page.locator('label:has-text("Number of People")').locator('..').locator('input[type="number"]');
+      const peopleInput = page.locator('label:has-text("People")').locator('..').locator('input[type="number"]');
       await peopleInput.fill('2');
 
       const budgetInput = page.locator('label:has-text("Budget")').locator('..').locator('input[type="number"]');
       await budgetInput.fill('150');
 
       // Submit form
-      const submitButton = page.getByRole('button', { name: 'Create Meal Plan' });
+      const submitButton = page.getByRole('button', { name: 'Generate AI Meal Plan' });
       await submitButton.click();
 
       // Wait for meal plan card to appear and check details
-      // Modal should close first
-      await expect(page.getByRole('heading', { name: 'Create Meal Plan' })).not.toBeVisible({ timeout: 5000 });
-
-      // Then check for "Your Meal Plans" section heading
+      // Check for "Your Meal Plans" section heading
       await expect(page.getByRole('heading', { name: 'Your Meal Plans' })).toBeVisible({ timeout: 5000 });
 
       // Verify meal plan details
@@ -260,6 +244,196 @@ test.describe('Meal Planning', () => {
     });
   });
 
+  test.describe('Streaming Meal Plan Creation', () => {
+    test('creates meal plan with streaming updates and handles empty prompt', async ({ page }) => {
+      let streamStarted = false;
+      const consoleErrors: string[] = [];
+      const pageErrors: string[] = [];
+
+      page.on('console', msg => {
+        if (msg.type() === 'error') {
+          consoleErrors.push(msg.text());
+        }
+      });
+
+      page.on('pageerror', error => {
+        pageErrors.push(error.message);
+      });
+
+      // Mock streaming endpoint
+      await page.route('**/api/meal-plans/stream*', async route => {
+        streamStarted = true;
+        const url = new URL(route.request().url());
+        const prompt = url.searchParams.get('prompt');
+        
+        // Verify prompt can be null/empty without errors
+        const stream = new ReadableStream({
+          start(controller) {
+            // Send initial event
+            controller.enqueue(new TextEncoder().encode('data: {"type":"agent_thinking","agent":"Meal Planning Expert","content":"Starting meal plan..."}\n\n'));
+            
+            // Send progress events
+            setTimeout(() => {
+              controller.enqueue(new TextEncoder().encode('data: {"type":"tool_start","tool":"CreateMealPlanTool","input_summary":"Creating plan"}\n\n'));
+            }, 100);
+            
+            setTimeout(() => {
+              controller.enqueue(new TextEncoder().encode('data: {"type":"tool_result","tool":"CreateMealPlanTool","summary":"Meal plan created"}\n\n'));
+            }, 200);
+            
+            setTimeout(() => {
+              controller.enqueue(new TextEncoder().encode('data: {"type":"complete","meal_plan":"Meal plan for 7 days"}\n\n'));
+            }, 300);
+            
+            setTimeout(() => {
+              controller.enqueue(new TextEncoder().encode('data: {"type":"done"}\n\n'));
+              controller.close();
+            }, 400);
+          }
+        });
+
+        await route.fulfill({
+          status: 200,
+          contentType: 'text/event-stream',
+          body: stream,
+        });
+      });
+
+      // Mock list endpoint
+      await page.route('**/api/meal-plans*', async route => {
+        if (route.request().method() === 'GET') {
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              status: 'success',
+              meal_plans: streamStarted ? [
+                {
+                  id: 1,
+                  name: 'Meal Plan 2025-12-14',
+                  start_date: '2025-12-14',
+                  end_date: '2025-12-20',
+                  people_count: 2,
+                  dietary_restrictions: [],
+                  meals: [],
+                  created_at: '2025-12-14T10:00:00'
+                }
+              ] : [],
+              total: streamStarted ? 1 : 0,
+              limit: 50,
+              offset: 0
+            })
+          });
+        }
+      });
+
+      await page.goto('/calendar');
+
+      // Fill form with empty prompt (this was causing the error)
+      const daysInput = page.locator('label:has-text("Days")').locator('..').locator('input[type="number"]').first();
+      await daysInput.fill('7');
+
+      const peopleInput = page.locator('label:has-text("People")').locator('..').locator('input[type="number"]');
+      await peopleInput.fill('2');
+
+      // Don't fill prompt - leave it empty to test the error scenario
+
+      // Submit form
+      const submitButton = page.getByRole('button', { name: 'Generate AI Meal Plan' });
+      await submitButton.click();
+
+      // Wait for AgentActivityPanel to appear
+      await expect(page.getByText('Creating Your Meal Plan')).toBeVisible({ timeout: 3000 });
+
+      // Wait for streaming to complete
+      await expect(page.getByText('Meal plan created successfully!')).toBeVisible({ timeout: 5000 });
+
+      // Verify no errors occurred (the bug would cause "Cannot read properties of undefined (reading 'length')")
+      expect(consoleErrors.filter(e => e.includes('Cannot read properties') || e.includes('length'))).toHaveLength(0);
+      expect(pageErrors.filter(e => e.includes('Cannot read properties') || e.includes('length'))).toHaveLength(0);
+
+      // Verify the panel shows the correct info without crashing
+      await expect(page.getByText(/7 days/)).toBeVisible();
+      await expect(page.getByText(/2 people/)).toBeVisible();
+    });
+
+    test('creates meal plan with prompt and displays it in AgentActivityPanel', async ({ page }) => {
+      const consoleErrors: string[] = [];
+      page.on('console', msg => {
+        if (msg.type() === 'error') {
+          consoleErrors.push(msg.text());
+        }
+      });
+
+      page.on('pageerror', error => {
+        consoleErrors.push(error.message);
+      });
+
+      // Mock streaming endpoint
+      await page.route('**/api/meal-plans/stream*', async route => {
+        const stream = new ReadableStream({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode('data: {"type":"agent_thinking","agent":"Meal Planning Expert","content":"Analyzing preferences..."}\n\n'));
+            setTimeout(() => {
+              controller.enqueue(new TextEncoder().encode('data: {"type":"complete","meal_plan":"Meal plan created"}\n\n'));
+            }, 100);
+            setTimeout(() => {
+              controller.enqueue(new TextEncoder().encode('data: {"type":"done"}\n\n'));
+              controller.close();
+            }, 200);
+          }
+        });
+
+        await route.fulfill({
+          status: 200,
+          contentType: 'text/event-stream',
+          body: stream,
+        });
+      });
+
+      await page.route('**/api/meal-plans*', async route => {
+        if (route.request().method() === 'GET') {
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              status: 'success',
+              meal_plans: [],
+              total: 0,
+              limit: 50,
+              offset: 0
+            })
+          });
+        }
+      });
+
+      await page.goto('/calendar');
+
+      // Fill form with a prompt
+      const daysInput = page.locator('label:has-text("Days")').locator('..').locator('input[type="number"]').first();
+      await daysInput.fill('7');
+
+      const peopleInput = page.locator('label:has-text("People")').locator('..').locator('input[type="number"]');
+      await peopleInput.fill('2');
+
+      const promptTextarea = page.locator('label:has-text("Preferences & Instructions")').locator('..').locator('textarea');
+      await promptTextarea.fill('vegetarian meals with Italian cuisine focus');
+
+      // Submit form
+      const submitButton = page.getByRole('button', { name: 'Generate AI Meal Plan' });
+      await submitButton.click();
+
+      // Wait for AgentActivityPanel
+      await expect(page.getByText('Creating Your Meal Plan')).toBeVisible({ timeout: 3000 });
+
+      // Verify prompt is displayed (truncated if long)
+      await expect(page.getByText(/vegetarian meals/)).toBeVisible();
+
+      // Verify no errors
+      expect(consoleErrors.filter(e => e.includes('Cannot read properties') || e.includes('length'))).toHaveLength(0);
+    });
+  });
+
   test.describe('Form Validation', () => {
     test('requires valid number inputs', async ({ page }) => {
       await page.route('**/api/meal-plans*', async route => {
@@ -282,12 +456,12 @@ test.describe('Meal Planning', () => {
       await page.getByRole('button', { name: 'Create Plan' }).click();
 
       // Try to set negative days (input should prevent it due to min=1)
-      const daysInput = page.locator('input[type="number"]').first();
+      const daysInput = page.locator('label:has-text("Days")').locator('..').locator('input[type="number"]').first();
       await expect(daysInput).toHaveAttribute('min', '1');
       await expect(daysInput).toHaveAttribute('max', '30');
 
       // Try to set negative people
-      const peopleInput = page.locator('label:has-text("Number of People")').locator('..').locator('input[type="number"]');
+      const peopleInput = page.locator('label:has-text("People")').locator('..').locator('input[type="number"]');
       await expect(peopleInput).toHaveAttribute('min', '1');
       await expect(peopleInput).toHaveAttribute('max', '20');
 
@@ -326,13 +500,11 @@ test.describe('Meal Planning', () => {
 
       await page.goto('/calendar');
 
-      // Open modal and submit
-      await page.getByRole('button', { name: 'Create Plan' }).click();
-
-      const daysInput = page.locator('input[type="number"]').first();
+      // Fill form and submit
+      const daysInput = page.locator('label:has-text("Days")').locator('..').locator('input[type="number"]').first();
       await daysInput.fill('7');
 
-      const submitButton = page.getByRole('button', { name: 'Create Meal Plan' });
+      const submitButton = page.getByRole('button', { name: 'Generate AI Meal Plan' });
       await submitButton.click();
 
       // Check error message appears
@@ -360,10 +532,8 @@ test.describe('Meal Planning', () => {
 
       await page.goto('/calendar');
 
-      // Open modal and submit
-      await page.getByRole('button', { name: 'Create Plan' }).click();
-
-      const submitButton = page.getByRole('button', { name: 'Create Meal Plan' });
+      // Fill form and submit
+      const submitButton = page.getByRole('button', { name: 'Generate AI Meal Plan' });
       await submitButton.click();
 
       // Check error is displayed
@@ -462,8 +632,7 @@ test.describe('Meal Planning', () => {
       await page.goto('/calendar');
 
       // Create a meal plan
-      await page.getByRole('button', { name: 'Create Plan' }).click();
-      await page.getByRole('button', { name: 'Create Meal Plan' }).click();
+      await page.getByRole('button', { name: 'Generate AI Meal Plan' }).click();
 
       // Wait for creation and reload
       await page.waitForTimeout(1500);

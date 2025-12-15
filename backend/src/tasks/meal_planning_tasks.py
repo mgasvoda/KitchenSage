@@ -12,7 +12,7 @@ class MealPlanningTasks:
     def create_meal_plan_task(self,
                              days: int = 7,
                              people: int = 2,
-                             dietary_restrictions: Optional[List[str]] = None,
+                             prompt: Optional[str] = None,
                              budget: Optional[float] = None) -> Task:
         """
         Task to create a comprehensive meal plan.
@@ -20,20 +20,23 @@ class MealPlanningTasks:
         Args:
             days: Number of days for the meal plan
             people: Number of people the plan should serve
-            dietary_restrictions: List of dietary restrictions
+            prompt: Free-form preferences and instructions
             budget: Optional budget constraint
             
         Returns:
             CrewAI Task object
         """
-        restrictions_text = ", ".join(dietary_restrictions) if dietary_restrictions else "None"
         budget_text = f"${budget:.2f}" if budget else "No budget limit"
+        preferences_text = prompt if prompt else "No specific preferences provided"
         
         return Task(
             description=f"""
-            Create a {days}-day meal plan for {people} people with the following requirements:
-            - Dietary restrictions: {restrictions_text}
-            - Budget constraint: {budget_text}
+            Create a {days}-day meal plan for {people} people.
+            
+            Budget constraint: {budget_text}
+            
+            User preferences and instructions:
+            {preferences_text}
             
             The meal plan should include:
             1. Breakfast, lunch, and dinner for each day
@@ -43,6 +46,7 @@ class MealPlanningTasks:
             5. Seasonal ingredient preferences
             6. Cost optimization within budget constraints
             
+            Pay close attention to the user's preferences and instructions above.
             Ensure meals complement each other and ingredients can be efficiently used
             across multiple recipes to minimize waste.
             """,

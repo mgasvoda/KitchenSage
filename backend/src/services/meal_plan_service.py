@@ -131,7 +131,7 @@ class MealPlanService:
         self,
         days: int = 7,
         people: int = 2,
-        dietary_restrictions: Optional[List[str]] = None,
+        prompt: Optional[str] = None,
         budget: Optional[float] = None,
     ) -> Dict[str, Any]:
         """
@@ -140,7 +140,7 @@ class MealPlanService:
         Args:
             days: Number of days for the meal plan
             people: Number of people to plan for
-            dietary_restrictions: Dietary restrictions
+            prompt: Free-form preferences and instructions
             budget: Optional budget constraint
             
         Returns:
@@ -150,7 +150,7 @@ class MealPlanService:
             result = self.kitchen_crew.create_meal_plan(
                 days=days,
                 people=people,
-                dietary_restrictions=dietary_restrictions,
+                prompt=prompt,
                 budget=budget,
             )
             
@@ -177,7 +177,7 @@ class MealPlanService:
         self,
         days: int = 7,
         people: int = 2,
-        dietary_restrictions: Optional[List[str]] = None,
+        prompt: Optional[str] = None,
         budget: Optional[float] = None,
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """
@@ -186,7 +186,7 @@ class MealPlanService:
         Args:
             days: Number of days for the meal plan
             people: Number of people to plan for
-            dietary_restrictions: Dietary restrictions
+            prompt: Free-form preferences and instructions
             budget: Optional budget constraint
             
         Yields:
@@ -198,16 +198,36 @@ class MealPlanService:
         # Queue for events from callback thread
         event_queue: queue.Queue = queue.Queue()
         
+        # Cancellation flag - thread checks this to stop early
+        cancel_event = threading.Event()
+        
         def run_crew():
             """Run the crew in a separate thread with callbacks."""
             try:
+                # Check for cancellation before starting
+                if cancel_event.is_set():
+                    logger.info("Crew execution cancelled before start")
+                    return
+                
+                def cancellable_callback(event):
+                    """Callback that checks for cancellation before queuing."""
+                    if cancel_event.is_set():
+                        # Don't queue events if cancelled
+                        return
+                    event_queue.put(event)
+                
                 result = self.kitchen_crew.create_meal_plan_with_callbacks(
                     days=days,
                     people=people,
-                    dietary_restrictions=dietary_restrictions,
+                    prompt=prompt,
                     budget=budget,
-                    event_callback=lambda event: event_queue.put(event),
+                    event_callback=cancellable_callback,
                 )
+                
+                # Check for cancellation before sending result
+                if cancel_event.is_set():
+                    logger.info("Crew execution cancelled after completion")
+                    return
                 
                 # Extract final result
                 if hasattr(result, 'raw'):
@@ -220,6 +240,9 @@ class MealPlanService:
                     "meal_plan": result_text,
                 })
             except Exception as e:
+                if cancel_event.is_set():
+                    logger.info(f"Crew execution cancelled with error (expected): {e}")
+                    return
                 logger.error(f"Error in crew execution: {e}")
                 event_queue.put({
                     "type": "error",
@@ -229,34 +252,65 @@ class MealPlanService:
                 event_queue.put(None)  # Signal completion
         
         # Start the crew in a thread
-        thread = threading.Thread(target=run_crew)
+        thread = threading.Thread(target=run_crew, daemon=True)
         thread.start()
         
-        # Send initial event
-        yield {
-            "type": "agent_thinking",
-            "agent": "Meal Planning Expert",
-            "content": f"Starting meal plan for {days} days, {people} people...",
-        }
-        
-        # Stream events from the queue
-        while True:
-            try:
-                # Check for events with timeout to allow async cooperation
-                event = await asyncio.to_thread(event_queue.get, timeout=0.1)
-                
-                if event is None:
-                    break
+        try:
+            # Send initial event
+            yield {
+                "type": "agent_thinking",
+                "agent": "Meal Planning Expert",
+                "content": f"Starting meal plan for {days} days, {people} people...",
+            }
+            
+            # Stream events from the queue
+            while True:
+                try:
+                    # Check for events with timeout to allow async cooperation
+                    event = await asyncio.to_thread(event_queue.get, timeout=0.1)
                     
-                yield event
-                
-            except queue.Empty:
-                continue
-            except Exception as e:
-                logger.error(f"Error getting event from queue: {e}")
-                break
+                    if event is None:
+                        break
+                        
+                    yield event
+                    
+                except queue.Empty:
+                    # Check if thread is still alive
+                    if not thread.is_alive():
+                        # Thread finished but no termination signal - drain queue
+                        try:
+                            while True:
+                                event = event_queue.get_nowait()
+                                if event is None:
+                                    break
+                                yield event
+                        except queue.Empty:
+                            pass
+                        break
+                    continue
+                except Exception as e:
+                    logger.error(f"Error getting event from queue: {e}")
+                    break
         
-        thread.join(timeout=5.0)
+        except GeneratorExit:
+            # Client disconnected or generator was closed early
+            logger.info("Meal plan stream closed early, signaling thread cancellation")
+            cancel_event.set()
+            raise
+        
+        finally:
+            # Signal cancellation in case generator exits for any reason
+            cancel_event.set()
+            
+            # Wait for thread with reasonable timeout
+            # Use shorter timeout since we've signaled cancellation
+            if thread.is_alive():
+                thread.join(timeout=2.0)
+                if thread.is_alive():
+                    logger.warning(
+                        "Meal plan thread did not terminate within timeout. "
+                        "Thread is daemon and will be cleaned up on process exit."
+                    )
     
     def delete_meal_plan(self, meal_plan_id: int) -> Dict[str, Any]:
         """

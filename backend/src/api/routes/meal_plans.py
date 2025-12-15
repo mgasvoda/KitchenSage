@@ -16,27 +16,37 @@ router = APIRouter()
 async def generate_meal_plan_sse_stream(
     days: int,
     people: int,
-    dietary_restrictions: Optional[List[str]],
+    prompt: Optional[str],
     budget: Optional[float],
 ) -> AsyncGenerator[str, None]:
     """
     Generate Server-Sent Events stream for meal plan creation.
     
     Streams agent activity events as the AI creates the meal plan.
+    Properly handles client disconnection to prevent orphaned threads.
     """
     service = MealPlanService()
+    stream = None
     
     try:
-        async for event in service.create_meal_plan_stream(
+        stream = service.create_meal_plan_stream(
             days=days,
             people=people,
-            dietary_restrictions=dietary_restrictions,
+            prompt=prompt,
             budget=budget,
-        ):
+        )
+        
+        async for event in stream:
             yield f"data: {json.dumps(event)}\n\n"
         
         # Send done event
         yield f"data: {json.dumps({'type': 'done'})}\n\n"
+        
+    except GeneratorExit:
+        # Client disconnected - ensure the service stream is properly closed
+        if stream is not None:
+            await stream.aclose()
+        raise
         
     except Exception as e:
         yield f"data: {json.dumps({'type': 'error', 'content': str(e)})}\n\n"
@@ -47,7 +57,7 @@ async def generate_meal_plan_sse_stream(
 async def create_meal_plan_stream(
     days: int = Query(7, ge=1, le=30, description="Number of days for the meal plan"),
     people: int = Query(2, ge=1, le=20, description="Number of people to plan for"),
-    dietary_restrictions: Optional[List[str]] = Query(None, description="Dietary restrictions"),
+    prompt: Optional[str] = Query(None, description="Free-form preferences and instructions for the meal plan"),
     budget: Optional[float] = Query(None, ge=0, description="Budget constraint"),
 ):
     """
@@ -64,7 +74,7 @@ async def create_meal_plan_stream(
     - done: Stream complete
     """
     return StreamingResponse(
-        generate_meal_plan_sse_stream(days, people, dietary_restrictions, budget),
+        generate_meal_plan_sse_stream(days, people, prompt, budget),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
@@ -109,7 +119,7 @@ async def get_meal_plan(meal_plan_id: int):
 async def create_meal_plan(
     days: int = Query(7, ge=1, le=30, description="Number of days for the meal plan"),
     people: int = Query(2, ge=1, le=20, description="Number of people to plan for"),
-    dietary_restrictions: Optional[List[str]] = Query(None, description="Dietary restrictions"),
+    prompt: Optional[str] = Query(None, description="Free-form preferences and instructions for the meal plan"),
     budget: Optional[float] = Query(None, ge=0, description="Budget constraint"),
 ):
     """
@@ -122,7 +132,7 @@ async def create_meal_plan(
     result = service.create_meal_plan(
         days=days,
         people=people,
-        dietary_restrictions=dietary_restrictions,
+        prompt=prompt,
         budget=budget,
     )
     
