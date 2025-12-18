@@ -10,7 +10,7 @@ from typing import Dict, Any, List, Optional
 from datetime import datetime
 
 from src.models import GroceryList, GroceryListCreate, GroceryItem, GroceryItemCreate
-from src.models import GroceryItemStatus, MeasurementUnit, IngredientCategory
+from src.models import GroceryItemStatus, MeasurementUnit, IngredientCategory, Ingredient
 from .base_repository import BaseRepository
 from .connection import get_db_session, RecordNotFoundError, ValidationError
 from .recipe_repository import IngredientRepository
@@ -114,22 +114,32 @@ class GroceryRepository(BaseRepository[GroceryList]):
         """Get all items for a grocery list."""
         try:
             query = """
-                SELECT gi.*, i.name, i.category, i.common_unit
+                SELECT gi.*,
+                       i.id as ing_id, i.name as ing_name, i.category as ing_category,
+                       i.common_unit as ing_common_unit, i.created_at as ing_created_at,
+                       i.updated_at as ing_updated_at
                 FROM grocery_items gi
                 JOIN ingredients i ON gi.ingredient_id = i.id
                 WHERE gi.grocery_list_id = ?
                 ORDER BY i.category, i.name
             """
-            
+
             with get_db_session() as conn:
                 cursor = conn.cursor()
                 cursor.execute(query, (grocery_list_id,))
                 rows = cursor.fetchall()
-                
+
                 items = []
                 for row in rows:
-                    # Create ingredient instance
-                    ingredient = self.ingredient_repo._row_to_model(row)
+                    # Create ingredient instance from aliased columns
+                    ingredient = Ingredient(
+                        id=row['ing_id'],
+                        name=row['ing_name'],
+                        category=IngredientCategory(row['ing_category']) if row['ing_category'] else IngredientCategory.OTHER,
+                        common_unit=MeasurementUnit(row['ing_common_unit']) if row['ing_common_unit'] else None,
+                        created_at=datetime.fromisoformat(row['ing_created_at']) if row['ing_created_at'] else None,
+                        updated_at=datetime.fromisoformat(row['ing_updated_at']) if row['ing_updated_at'] else None
+                    )
                     
                     # Create grocery item
                     grocery_item = GroceryItem(
