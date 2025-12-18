@@ -81,8 +81,7 @@ def create_database():
         CREATE TABLE IF NOT EXISTS meal_plans (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
-            start_date DATE,
-            end_date DATE,
+            is_active BOOLEAN DEFAULT FALSE,
             people_count INTEGER,
             dietary_restrictions TEXT,
             description TEXT,
@@ -100,7 +99,7 @@ def create_database():
             meal_plan_id INTEGER,
             recipe_id INTEGER,
             meal_type TEXT,
-            meal_date DATE,
+            day_number INTEGER,
             servings_override INTEGER,
             notes TEXT,
             FOREIGN KEY (meal_plan_id) REFERENCES meal_plans (id),

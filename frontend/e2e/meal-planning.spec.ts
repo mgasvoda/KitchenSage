@@ -13,7 +13,7 @@ import { test, expect } from '@playwright/test';
 test.describe('Meal Planning', () => {
 
   test.describe('Page Rendering', () => {
-    test('renders calendar page with create button', async ({ page }) => {
+    test('renders meal plans page with create button', async ({ page }) => {
       // Mock empty meal plans initially
       await page.route('**/api/meal-plans*', async route => {
         await route.fulfill({
@@ -29,16 +29,13 @@ test.describe('Meal Planning', () => {
         });
       });
 
-      await page.goto('/calendar');
+      await page.goto('/meal-plans');
 
       // Check main heading
-      await expect(page.getByRole('heading', { name: 'Meal Planning' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Meal Plans' })).toBeVisible();
 
       // Check create button
       await expect(page.getByRole('button', { name: 'Generate AI Meal Plan' })).toBeVisible();
-
-      // Check week view grid is present
-      await expect(page.locator('.grid.grid-cols-7').first()).toBeVisible();
     });
 
     test('displays empty state when no meal plans exist', async ({ page }) => {
@@ -57,7 +54,7 @@ test.describe('Meal Planning', () => {
         });
       });
 
-      await page.goto('/calendar');
+      await page.goto('/meal-plans');
 
       // Wait for loading to finish
       await page.waitForTimeout(500);
@@ -84,7 +81,7 @@ test.describe('Meal Planning', () => {
         });
       });
 
-      await page.goto('/calendar');
+      await page.goto('/meal-plans');
 
       // Check form fields are visible (inline form, not modal)
       await expect(page.locator('label:has-text("Days")')).toBeVisible();
@@ -110,9 +107,8 @@ test.describe('Meal Planning', () => {
               meal_plans: createCalled ? [
                 {
                   id: 1,
-                  name: 'Meal Plan 2025-12-14',
-                  start_date: '2025-12-14',
-                  end_date: '2025-12-20',
+                  name: 'Mediterranean Week',
+                  is_active: false,
                   people_count: 2,
                   dietary_restrictions: [],
                   meals: [
@@ -120,7 +116,7 @@ test.describe('Meal Planning', () => {
                       id: 1,
                       recipe_id: 5,
                       meal_type: 'dinner',
-                      meal_date: '2025-12-14',
+                      day_number: 1,
                       recipe: { name: 'Pasta Primavera' }
                     }
                   ],
@@ -143,9 +139,8 @@ test.describe('Meal Planning', () => {
               message: 'Meal plan created successfully',
               meal_plan: {
                 id: 1,
-                name: 'Meal Plan 2025-12-14',
-                start_date: '2025-12-14',
-                end_date: '2025-12-20',
+                name: 'Mediterranean Week',
+                is_active: false,
                 people_count: postData.people || 2,
                 dietary_restrictions: [],
                 meals: []
@@ -155,7 +150,7 @@ test.describe('Meal Planning', () => {
         }
       });
 
-      await page.goto('/calendar');
+      await page.goto('/meal-plans');
 
       // Fill form (inline form, not modal)
       const daysInput = page.locator('label:has-text("Days")').locator('..').locator('input[type="number"]').first();
@@ -191,25 +186,23 @@ test.describe('Meal Planning', () => {
               {
                 id: 1,
                 name: 'Weekly Plan #1',
-                start_date: '2025-12-14',
-                end_date: '2025-12-20',
+                is_active: true,
                 people_count: 4,
                 dietary_restrictions: ['vegetarian', 'gluten-free'],
                 meals: [
-                  { id: 1, recipe_id: 1, meal_type: 'dinner', meal_date: '2025-12-14' },
-                  { id: 2, recipe_id: 2, meal_type: 'lunch', meal_date: '2025-12-15' }
+                  { id: 1, recipe_id: 1, meal_type: 'dinner', day_number: 1 },
+                  { id: 2, recipe_id: 2, meal_type: 'lunch', day_number: 2 }
                 ],
                 created_at: '2025-12-14T10:00:00'
               },
               {
                 id: 2,
                 name: 'Weekend Special',
-                start_date: '2025-12-21',
-                end_date: '2025-12-22',
+                is_active: false,
                 people_count: 2,
                 dietary_restrictions: ['vegan'],
                 meals: [
-                  { id: 3, recipe_id: 3, meal_type: 'breakfast', meal_date: '2025-12-21' }
+                  { id: 3, recipe_id: 3, meal_type: 'breakfast', day_number: 1 }
                 ],
                 created_at: '2025-12-13T15:30:00'
               }
@@ -221,7 +214,7 @@ test.describe('Meal Planning', () => {
         });
       });
 
-      await page.goto('/calendar');
+      await page.goto('/meal-plans');
 
       // Wait for loading
       await page.waitForTimeout(500);
@@ -311,8 +304,7 @@ test.describe('Meal Planning', () => {
                 {
                   id: 1,
                   name: 'Meal Plan 2025-12-14',
-                  start_date: '2025-12-14',
-                  end_date: '2025-12-20',
+                  is_active: false,
                   people_count: 2,
                   dietary_restrictions: [],
                   meals: [],
@@ -327,7 +319,7 @@ test.describe('Meal Planning', () => {
         }
       });
 
-      await page.goto('/calendar');
+      await page.goto('/meal-plans');
 
       // Fill form with empty prompt (this was causing the error)
       const daysInput = page.locator('label:has-text("Days")').locator('..').locator('input[type="number"]').first();
@@ -407,7 +399,7 @@ test.describe('Meal Planning', () => {
         }
       });
 
-      await page.goto('/calendar');
+      await page.goto('/meal-plans');
 
       // Fill form with a prompt
       const daysInput = page.locator('label:has-text("Days")').locator('..').locator('input[type="number"]').first();
@@ -450,11 +442,9 @@ test.describe('Meal Planning', () => {
         });
       });
 
-      await page.goto('/calendar');
+      await page.goto('/meal-plans');
 
-      // Open modal
-      await page.getByRole('button', { name: 'Create Plan' }).click();
-
+      // Form is inline, no modal to open
       // Try to set negative days (input should prevent it due to min=1)
       const daysInput = page.locator('label:has-text("Days")').locator('..').locator('input[type="number"]').first();
       await expect(daysInput).toHaveAttribute('min', '1');
@@ -498,7 +488,7 @@ test.describe('Meal Planning', () => {
         }
       });
 
-      await page.goto('/calendar');
+      await page.goto('/meal-plans');
 
       // Fill form and submit
       const daysInput = page.locator('label:has-text("Days")').locator('..').locator('input[type="number"]').first();
@@ -530,7 +520,7 @@ test.describe('Meal Planning', () => {
         }
       });
 
-      await page.goto('/calendar');
+      await page.goto('/meal-plans');
 
       // Fill form and submit
       const submitButton = page.getByRole('button', { name: 'Generate AI Meal Plan' });
@@ -545,7 +535,7 @@ test.describe('Meal Planning', () => {
         await route.abort('failed');
       });
 
-      await page.goto('/calendar');
+      await page.goto('/meal-plans');
 
       // Wait and check error message appears in red error box
       await expect(page.locator('.bg-red-50')).toBeVisible({ timeout: 3000 });
@@ -567,8 +557,7 @@ test.describe('Meal Planning', () => {
                 {
                   id: 1,
                   name: 'Test Plan',
-                  start_date: '2025-12-14',
-                  end_date: '2025-12-20',
+                  is_active: false,
                   people_count: 2,
                   dietary_restrictions: [],
                   // Meals should be in a separate array, not as a column
@@ -579,7 +568,7 @@ test.describe('Meal Planning', () => {
                       meal_plan_id: 1,
                       recipe_id: 5,
                       meal_type: 'dinner',
-                      meal_date: '2025-12-14',
+                      day_number: 1,
                       servings_override: null,
                       notes: null,
                       recipe: { name: 'Pasta' }
@@ -589,7 +578,7 @@ test.describe('Meal Planning', () => {
                       meal_plan_id: 1,
                       recipe_id: 6,
                       meal_type: 'lunch',
-                      meal_date: '2025-12-15',
+                      day_number: 2,
                       servings_override: 4,
                       notes: 'Extra portions',
                       recipe: { name: 'Salad' }
@@ -618,8 +607,7 @@ test.describe('Meal Planning', () => {
               meal_plan: {
                 id: 1,
                 name: 'Test Plan',
-                start_date: '2025-12-14',
-                end_date: '2025-12-20',
+                is_active: false,
                 people_count: 2,
                 dietary_restrictions: [],
                 meals: []
@@ -629,7 +617,7 @@ test.describe('Meal Planning', () => {
         }
       });
 
-      await page.goto('/calendar');
+      await page.goto('/meal-plans');
 
       // Create a meal plan
       await page.getByRole('button', { name: 'Generate AI Meal Plan' }).click();
@@ -654,8 +642,7 @@ test.describe('Meal Planning', () => {
               {
                 id: 1,
                 name: 'Healthy Plan',
-                start_date: '2025-12-14',
-                end_date: '2025-12-20',
+                is_active: false,
                 people_count: 2,
                 dietary_restrictions: [],
                 meals: [
@@ -664,7 +651,7 @@ test.describe('Meal Planning', () => {
                     meal_plan_id: 1,
                     recipe_id: 1,
                     meal_type: 'breakfast',
-                    meal_date: '2025-12-14',
+                    day_number: 1,
                     recipe: {
                       id: 1,
                       name: 'Healthy Breakfast',
@@ -678,7 +665,7 @@ test.describe('Meal Planning', () => {
                     meal_plan_id: 1,
                     recipe_id: 2,
                     meal_type: 'lunch',
-                    meal_date: '2025-12-14',
+                    day_number: 1,
                     recipe: {
                       id: 2,
                       name: 'Nutritious Lunch',
@@ -697,7 +684,7 @@ test.describe('Meal Planning', () => {
                     meal_plan_id: 1,
                     recipe_id: 3,
                     meal_type: 'dinner',
-                    meal_date: '2025-12-14',
+                    day_number: 1,
                     recipe: {
                       id: 3,
                       name: 'Light Dinner',
@@ -728,7 +715,7 @@ test.describe('Meal Planning', () => {
         consoleErrors.push(error.message);
       });
 
-      await page.goto('/calendar');
+      await page.goto('/meal-plans');
 
       // Wait for page to load
       await page.waitForTimeout(1000);
@@ -746,13 +733,173 @@ test.describe('Meal Planning', () => {
     });
   });
 
+  test.describe('Active Plan Management', () => {
+    test('displays active badge on active plan', async ({ page }) => {
+      await page.route('**/api/meal-plans*', async route => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            status: 'success',
+            meal_plans: [
+              {
+                id: 1,
+                name: 'Active Plan',
+                is_active: true,
+                people_count: 2,
+                dietary_restrictions: [],
+                meals: [
+                  { id: 1, recipe_id: 1, meal_type: 'dinner', day_number: 1 }
+                ],
+                created_at: '2025-12-14T10:00:00'
+              },
+              {
+                id: 2,
+                name: 'Inactive Plan',
+                is_active: false,
+                people_count: 2,
+                dietary_restrictions: [],
+                meals: [],
+                created_at: '2025-12-14T10:00:00'
+              }
+            ],
+            total: 2,
+            limit: 50,
+            offset: 0
+          })
+        });
+      });
+
+      await page.goto('/meal-plans');
+      await page.waitForTimeout(500);
+
+      // Check active badge is displayed on active plan
+      await expect(page.getByRole('heading', { name: 'Active Plan' }).locator('..').locator('..').getByText('Active').first()).toBeVisible();
+
+      // Check inactive plan card exists
+      await expect(page.getByRole('heading', { name: 'Inactive Plan' })).toBeVisible();
+    });
+
+    test('can activate a meal plan', async ({ page }) => {
+      let activePlanId = 1;
+
+      await page.route('**/api/meal-plans/*/activate', async route => {
+        const url = route.request().url();
+        const match = url.match(/\/meal-plans\/(\d+)\/activate/);
+        if (match) {
+          activePlanId = parseInt(match[1]);
+        }
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            status: 'success',
+            message: 'Meal plan activated successfully'
+          })
+        });
+      });
+
+      await page.route('**/api/meal-plans*', async route => {
+        if (route.request().method() === 'GET') {
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              status: 'success',
+              meal_plans: [
+                {
+                  id: 1,
+                  name: 'Plan A',
+                  is_active: activePlanId === 1,
+                  people_count: 2,
+                  dietary_restrictions: [],
+                  meals: [],
+                  created_at: '2025-12-14T10:00:00'
+                },
+                {
+                  id: 2,
+                  name: 'Plan B',
+                  is_active: activePlanId === 2,
+                  people_count: 2,
+                  dietary_restrictions: [],
+                  meals: [],
+                  created_at: '2025-12-14T10:00:00'
+                }
+              ],
+              total: 2,
+              limit: 50,
+              offset: 0
+            })
+          });
+        }
+      });
+
+      await page.goto('/meal-plans');
+      await page.waitForTimeout(500);
+
+      // Plan A should be active initially
+      const planACard = page.locator('text=Plan A').locator('..').locator('..');
+      await expect(planACard.getByText('Active')).toBeVisible();
+
+      // Click "Set Active" on Plan B
+      const planBCard = page.locator('text=Plan B').locator('..').locator('..');
+      await planBCard.getByRole('button', { name: 'Set Active' }).click();
+
+      // Wait for page to update
+      await page.waitForTimeout(1000);
+
+      // Plan B should now be active
+      await expect(planBCard.getByText('Active')).toBeVisible();
+    });
+
+    test('meal plan cards show day count instead of date range', async ({ page }) => {
+      await page.route('**/api/meal-plans*', async route => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            status: 'success',
+            meal_plans: [
+              {
+                id: 1,
+                name: '7-Day Plan',
+                is_active: true,
+                people_count: 2,
+                dietary_restrictions: [],
+                meals: [
+                  { id: 1, recipe_id: 1, meal_type: 'breakfast', day_number: 1 },
+                  { id: 2, recipe_id: 2, meal_type: 'lunch', day_number: 1 },
+                  { id: 3, recipe_id: 3, meal_type: 'dinner', day_number: 1 },
+                  { id: 4, recipe_id: 4, meal_type: 'breakfast', day_number: 7 }
+                ],
+                created_at: '2025-12-14T10:00:00'
+              }
+            ],
+            total: 1,
+            limit: 50,
+            offset: 0
+          })
+        });
+      });
+
+      await page.goto('/meal-plans');
+      await page.waitForTimeout(500);
+
+      // Should show "7-day plan" based on max day_number (use exact match to avoid ambiguity)
+      await expect(page.getByText('📅 7-day plan')).toBeVisible();
+
+      // Should NOT show date ranges
+      await expect(page.getByText(/Dec \d+/)).not.toBeVisible();
+      await expect(page.getByText(/2025-\d{2}-\d{2}/)).not.toBeVisible();
+    });
+  });
+
   test.describe('Edge Cases', () => {
     test('handles large number of meal plans', async ({ page }) => {
       const mealPlans = Array.from({ length: 15 }, (_, i) => ({
         id: i + 1,
         name: `Meal Plan ${i + 1}`,
-        start_date: '2025-12-14',
-        end_date: '2025-12-20',
+        is_active: i === 0,
         people_count: 2,
         dietary_restrictions: [],
         meals: [],
@@ -773,7 +920,7 @@ test.describe('Meal Planning', () => {
         });
       });
 
-      await page.goto('/calendar');
+      await page.goto('/meal-plans');
 
       // Wait for loading
       await page.waitForTimeout(500);
@@ -782,9 +929,9 @@ test.describe('Meal Planning', () => {
       await expect(page.getByRole('heading', { name: 'Meal Plan 1', exact: true })).toBeVisible();
       await expect(page.getByRole('heading', { name: 'Meal Plan 15' })).toBeVisible();
 
-      // Check grid layout
-      const mealPlanCards = page.locator('.bg-white.rounded-xl.shadow-sm.border.border-cream-200');
-      expect(await mealPlanCards.count()).toBeGreaterThanOrEqual(15);
+      // Check that all meal plans are rendered (at least 15 meal plan headings)
+      const mealPlanHeadings = page.locator('h3.font-display').filter({ hasText: /^Meal Plan \d+/ });
+      expect(await mealPlanHeadings.count()).toBe(15);
     });
 
     test('displays meal plan with no meals', async ({ page }) => {
@@ -798,8 +945,7 @@ test.describe('Meal Planning', () => {
               {
                 id: 1,
                 name: 'Empty Plan',
-                start_date: '2025-12-14',
-                end_date: '2025-12-20',
+                is_active: false,
                 people_count: 2,
                 dietary_restrictions: [],
                 meals: [],
@@ -813,7 +959,7 @@ test.describe('Meal Planning', () => {
         });
       });
 
-      await page.goto('/calendar');
+      await page.goto('/meal-plans');
 
       // Should display meal plan even with 0 meals
       await expect(page.getByText('Empty Plan')).toBeVisible();
@@ -831,8 +977,7 @@ test.describe('Meal Planning', () => {
               {
                 id: 1,
                 name: 'A Very Long Meal Plan Name That Should Still Display Correctly Without Breaking The Layout',
-                start_date: '2025-12-14',
-                end_date: '2025-12-20',
+                is_active: false,
                 people_count: 2,
                 dietary_restrictions: [],
                 meals: [],
@@ -846,7 +991,7 @@ test.describe('Meal Planning', () => {
         });
       });
 
-      await page.goto('/calendar');
+      await page.goto('/meal-plans');
 
       // Should display long name without layout issues
       await expect(page.getByText(/A Very Long Meal Plan Name/)).toBeVisible();

@@ -48,28 +48,19 @@ export function MealPlanDetailModal({
     }
   };
 
-  const getMealsByDate = () => {
+  const getMealsByDayNumber = () => {
     if (!mealPlan) return {};
 
-    const mealsByDate: Record<string, Record<string, Meal>> = {};
+    const mealsByDay: Record<number, Record<string, Meal>> = {};
 
     mealPlan.meals.forEach((meal) => {
-      if (!mealsByDate[meal.meal_date]) {
-        mealsByDate[meal.meal_date] = {};
+      if (!mealsByDay[meal.day_number]) {
+        mealsByDay[meal.day_number] = {};
       }
-      mealsByDate[meal.meal_date][meal.meal_type] = meal;
+      mealsByDay[meal.day_number][meal.meal_type] = meal;
     });
 
-    return mealsByDate;
-  };
-
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', {
-      weekday: 'long',
-      month: 'short',
-      day: 'numeric'
-    });
+    return mealsByDay;
   };
 
   const getMealTypeIcon = (mealType: string) => {
@@ -124,7 +115,8 @@ export function MealPlanDetailModal({
             </h2>
             {mealPlan && (
               <p className="text-sage-100 text-sm mt-1">
-                {formatDate(mealPlan.start_date)} - {formatDate(mealPlan.end_date)} • {mealPlan.people_count} people
+                {Object.keys(getMealsByDayNumber()).length}-day plan • {mealPlan.people_count} people
+                {mealPlan.is_active && <span className="ml-2 px-2 py-0.5 bg-terracotta-500 text-white rounded text-xs">Active</span>}
               </p>
             )}
           </div>
@@ -172,16 +164,18 @@ export function MealPlanDetailModal({
               )}
 
               {/* Meals by Day */}
-              {Object.entries(getMealsByDate()).length === 0 ? (
+              {Object.entries(getMealsByDayNumber()).length === 0 ? (
                 <div className="text-center py-8 text-sage-600">
                   No meals planned yet
                 </div>
               ) : (
-                Object.entries(getMealsByDate()).map(([date, meals]) => (
-                  <div key={date} className="border border-cream-200 rounded-xl overflow-hidden">
+                Object.entries(getMealsByDayNumber())
+                  .sort(([a], [b]) => Number(a) - Number(b))
+                  .map(([dayNumber, meals]) => (
+                  <div key={dayNumber} className="border border-cream-200 rounded-xl overflow-hidden">
                     <div className="bg-cream-100 px-4 py-3 border-b border-cream-200">
                       <h3 className="font-display font-bold text-sage-800">
-                        {formatDate(date)}
+                        Day {dayNumber}
                       </h3>
                     </div>
                     <div className="divide-y divide-cream-200">

@@ -228,6 +228,16 @@ export const mealPlanApi = {
     }
   },
 
+  activate: async (id: number): Promise<{ status: string; message: string; meal_plan: MealPlan }> => {
+    return fetchApi(`/meal-plans/${id}/activate`, {
+      method: 'POST',
+    });
+  },
+
+  getActive: async (): Promise<{ status: string; message?: string; meal_plan: MealPlan | null }> => {
+    return fetchApi('/meal-plans/active');
+  },
+
   delete: async (id: number): Promise<{ status: string }> => {
     return fetchApi(`/meal-plans/${id}`, {
       method: 'DELETE',

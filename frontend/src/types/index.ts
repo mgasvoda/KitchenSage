@@ -69,7 +69,7 @@ export interface Meal {
   recipe_id: number;
   recipe?: Recipe;
   meal_type: 'breakfast' | 'lunch' | 'dinner' | 'snack';
-  meal_date: string;
+  day_number: number;
   servings_override?: number | null;
   notes?: string | null;
 }
@@ -77,8 +77,7 @@ export interface Meal {
 export interface MealPlan {
   id: number;
   name: string;
-  start_date: string;
-  end_date: string;
+  is_active: boolean;
   meals: Meal[];
   people_count: number;
   dietary_restrictions: string[];

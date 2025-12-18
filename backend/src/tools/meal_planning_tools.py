@@ -35,10 +35,9 @@ class MealPlanningTool(BaseTool):
     def _run(self, requirements: Dict[str, Any]) -> Dict[str, Any]:
         """
         Create a meal plan based on requirements.
-        
+
         Args:
             requirements: Dictionary containing meal plan requirements like:
-                - start_date: Start date for meal plan
                 - days: Number of days (default: 7)
                 - people: Number of people (default: 2)
                 - dietary_restrictions: List of dietary tags
@@ -46,7 +45,8 @@ class MealPlanningTool(BaseTool):
                 - difficulty: Preferred difficulty level
                 - cuisine_preferences: List of preferred cuisines
                 - exclude_ingredients: List of ingredients to avoid
-                
+                - prompt: User's original prompt for title generation
+
         Returns:
             Generated meal plan with assigned recipes
         """
@@ -54,9 +54,8 @@ class MealPlanningTool(BaseTool):
             # Parse requirements
             days = requirements.get('days', 7)
             people = requirements.get('people', 2)
-            start_date_str = requirements.get('start_date', datetime.now().strftime('%Y-%m-%d'))
-            start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
-            
+            prompt = requirements.get('prompt', '')
+
             dietary_restrictions = requirements.get('dietary_restrictions', [])
             max_prep_time = requirements.get('max_prep_time', 60)
             difficulty = requirements.get('difficulty')
@@ -91,42 +90,40 @@ class MealPlanningTool(BaseTool):
                 return {
                     "status": "warning",
                     "message": f"Limited recipes available ({len(recipe_dicts)}). Meal plan may have repetitions.",
-                    "meal_plan": self._create_basic_meal_plan(recipe_dicts, days, people, start_date)
+                    "meal_plan": self._create_basic_meal_plan(recipe_dicts, days, people)
                 }
-            
+
             # Create optimized meal plan
             meal_plan = self._create_optimized_meal_plan(
-                recipe_dicts, days, people, start_date, requirements
+                recipe_dicts, days, people, requirements
             )
-            
+
+            # Generate semantic title based on meal content and user prompt
+            title = self._generate_semantic_title(meal_plan['meals'], requirements, recipe_dicts)
+
             # Save to database
             meal_plan_data = {
-                'name': f"Meal Plan {start_date.strftime('%Y-%m-%d')}",
-                'start_date': start_date.isoformat(),
-                'end_date': (start_date + timedelta(days=days-1)).isoformat(),
+                'name': title,
+                'is_active': False,
                 'people_count': people,
                 'dietary_restrictions': json.dumps(dietary_restrictions) if dietary_restrictions else json.dumps([])
             }
 
             meal_plan_id = self._get_repositories()['meal_plans'].create(meal_plan_data)
             meal_plan['meal_plan_id'] = meal_plan_id
-            
+
             # Save meals separately
             meal_plan_repo = self._get_repositories()['meal_plans']
             for meal_data in meal_plan['meals']:
-                # Convert meal data to proper format and save using the repository
-                meal_date = meal_data.get('date')
-                if isinstance(meal_date, str):
-                    meal_date = datetime.strptime(meal_date, '%Y-%m-%d').date()
-                
                 meal_type_value = meal_data.get('meal_type')
                 meal_type = MealType(meal_type_value)
-                
+                day_number = meal_data.get('day_number', 1)
+
                 meal_plan_repo.add_meal_to_plan(
                     meal_plan_id=meal_plan_id,
                     recipe_id=meal_data.get('recipe_id'),
                     meal_type=meal_type,
-                    meal_date=meal_date,
+                    day_number=day_number,
                     servings_override=meal_data.get('servings'),
                     notes=meal_data.get('notes')
                 )
@@ -202,15 +199,13 @@ class MealPlanningTool(BaseTool):
         
         return filtered_recipes
     
-    def _create_basic_meal_plan(self, recipes: List[Dict[str, Any]], days: int, 
-                               people: int, start_date: date) -> Dict[str, Any]:
+    def _create_basic_meal_plan(self, recipes: List[Dict[str, Any]], days: int,
+                               people: int) -> Dict[str, Any]:
         """Create a basic meal plan with simple recipe assignment."""
         meals = []
         recipe_index = 0
-        
-        for day in range(days):
-            current_date = start_date + timedelta(days=day)
-            
+
+        for day in range(1, days + 1):  # day_number is 1-based
             # Assign breakfast, lunch, dinner
             for meal_type in [MealType.BREAKFAST, MealType.LUNCH, MealType.DINNER]:
                 if recipe_index < len(recipes):
@@ -223,7 +218,7 @@ class MealPlanningTool(BaseTool):
                 
                 if recipe:
                     meal = {
-                        'date': current_date,
+                        'day_number': day,
                         'meal_type': meal_type.value,
                         'recipe_id': recipe['id'],
                         'recipe_name': recipe['name'],
@@ -232,82 +227,76 @@ class MealPlanningTool(BaseTool):
                         'cook_time': recipe.get('cook_time', 0)
                     }
                     meals.append(meal)
-        
+
         return {
             'days': days,
             'people': people,
-            'start_date': start_date,
-            'end_date': start_date + timedelta(days=days-1),
             'meals': meals,
             'total_recipes': len(set(meal['recipe_id'] for meal in meals))
         }
     
     def _create_optimized_meal_plan(self, recipes: List[Dict[str, Any]], days: int,
-                                   people: int, start_date: date, 
+                                   people: int,
                                    requirements: Dict[str, Any]) -> Dict[str, Any]:
         """Create an optimized meal plan with balanced nutrition and variety."""
-        
+
         # Filter recipes by requirements
         dietary_restrictions = requirements.get('dietary_restrictions', [])
         cuisine_preferences = requirements.get('cuisine_preferences', [])
         exclude_ingredients = requirements.get('exclude_ingredients', [])
-        
+
         filtered_recipes = self._filter_recipes_by_requirements(
             recipes, dietary_restrictions, cuisine_preferences, exclude_ingredients
         )
-        
+
         # Categorize recipes by meal type suitability
         breakfast_recipes = self._categorize_recipes_for_meal_type(filtered_recipes, MealType.BREAKFAST)
         lunch_recipes = self._categorize_recipes_for_meal_type(filtered_recipes, MealType.LUNCH)
         dinner_recipes = self._categorize_recipes_for_meal_type(filtered_recipes, MealType.DINNER)
-        
+
         meals = []
         used_recipes = set()
-        
-        for day in range(days):
-            current_date = start_date + timedelta(days=day)
-            
+
+        for day in range(1, days + 1):  # day_number is 1-based
             # Assign breakfast
             breakfast = self._select_optimal_recipe(
                 breakfast_recipes, used_recipes, MealType.BREAKFAST, people
             )
             if breakfast:
                 meals.append({
-                    'date': current_date,
+                    'day_number': day,
                     'meal_type': MealType.BREAKFAST.value,
                     **breakfast
                 })
                 used_recipes.add(breakfast['recipe_id'])
-            
+
             # Assign lunch
             lunch = self._select_optimal_recipe(
                 lunch_recipes, used_recipes, MealType.LUNCH, people
             )
             if lunch:
                 meals.append({
-                    'date': current_date,
+                    'day_number': day,
                     'meal_type': MealType.LUNCH.value,
                     **lunch
                 })
                 used_recipes.add(lunch['recipe_id'])
-            
+
             # Assign dinner
             dinner = self._select_optimal_recipe(
                 dinner_recipes, used_recipes, MealType.DINNER, people
             )
             if dinner:
                 meals.append({
-                    'date': current_date,
+                    'day_number': day,
                     'meal_type': MealType.DINNER.value,
                     **dinner
                 })
                 used_recipes.add(dinner['recipe_id'])
-        
+
         return {
             'days': days,
             'people': people,
-            'start_date': start_date,
-            'end_date': start_date + timedelta(days=days-1),
             'meals': meals,
             'total_recipes': len(used_recipes),
             'variety_score': len(used_recipes) / len(meals) if meals else 0
@@ -404,6 +393,137 @@ class MealPlanningTool(BaseTool):
             'prep_time': selected_recipe.get('prep_time', 0),
             'cook_time': selected_recipe.get('cook_time', 0)
         }
+
+    def _generate_semantic_title(self, meals: List[Dict[str, Any]],
+                                 requirements: Dict[str, Any],
+                                 recipes: List[Dict[str, Any]]) -> str:
+        """
+        Generate a semantic title for the meal plan based on content analysis.
+
+        Analyzes:
+        - Cuisine types from recipes
+        - Dietary patterns
+        - Prep time themes
+        - User prompt keywords
+
+        Returns titles like:
+        - "Mediterranean Week: Italian & Greek Classics"
+        - "Quick Weeknight Dinners"
+        - "Vegetarian High-Protein Meal Plan"
+
+        Args:
+            meals: List of meals in the plan
+            requirements: Original requirements dict
+            recipes: All recipes used
+
+        Returns:
+            Descriptive title string
+        """
+        try:
+            # Extract user prompt for keywords
+            prompt = requirements.get('prompt', '').lower()
+
+            # Analyze cuisines
+            cuisines = {}
+            for recipe in recipes:
+                cuisine = recipe.get('cuisine', '').strip()
+                if cuisine:
+                    cuisines[cuisine] = cuisines.get(cuisine, 0) + 1
+
+            # Find dominant cuisines (>30% of recipes)
+            total_recipes = len(recipes) if recipes else 1
+            dominant_cuisines = [
+                cuisine for cuisine, count in cuisines.items()
+                if count / total_recipes > 0.3
+            ]
+
+            # Analyze prep times for "quick" theme
+            avg_prep_time = 0
+            if recipes:
+                prep_times = [r.get('prep_time', 0) for r in recipes]
+                avg_prep_time = sum(prep_times) / len(prep_times)
+
+            # Analyze dietary restrictions
+            dietary_restrictions = requirements.get('dietary_restrictions', [])
+
+            # Build title components
+            title_parts = []
+
+            # Dietary prefix (if applicable)
+            if dietary_restrictions:
+                if 'vegetarian' in dietary_restrictions:
+                    title_parts.append("Vegetarian")
+                elif 'vegan' in dietary_restrictions:
+                    title_parts.append("Vegan")
+                elif 'keto' in dietary_restrictions:
+                    title_parts.append("Keto")
+                elif 'paleo' in dietary_restrictions:
+                    title_parts.append("Paleo")
+
+            # Cuisine theme (if dominant)
+            if dominant_cuisines:
+                if len(dominant_cuisines) == 1:
+                    title_parts.append(dominant_cuisines[0])
+                elif len(dominant_cuisines) == 2:
+                    title_parts.append(f"{dominant_cuisines[0]} & {dominant_cuisines[1]}")
+                else:
+                    title_parts.append("International")
+
+            # Prep time theme
+            if avg_prep_time < 20 and ('quick' in prompt or 'easy' in prompt or 'weeknight' in prompt):
+                title_parts.append("Quick Meals")
+            elif avg_prep_time < 30:
+                if 'weeknight' in prompt or 'busy' in prompt:
+                    title_parts.append("Weeknight Dinners")
+
+            # Special keywords from prompt
+            if 'family' in prompt:
+                title_parts.append("Family")
+            if 'budget' in prompt or 'cheap' in prompt:
+                title_parts.append("Budget-Friendly")
+            if 'healthy' in prompt:
+                title_parts.append("Healthy")
+            if 'comfort' in prompt:
+                title_parts.append("Comfort Food")
+
+            # Fallback: analyze number of days
+            days = requirements.get('days', 7)
+
+            # Build final title
+            if title_parts:
+                # If we have components, combine them
+                if len(title_parts) == 1:
+                    title = f"{title_parts[0]} Week"
+                elif len(title_parts) == 2:
+                    title = f"{title_parts[0]} {title_parts[1]}"
+                else:
+                    # Join first parts and add context
+                    title = " ".join(title_parts[:2])
+                    if len(title_parts) > 2:
+                        title += f": {title_parts[2]}"
+            else:
+                # Fallback to descriptive default
+                if days == 7:
+                    title = "Weekly Meal Plan"
+                elif days == 14:
+                    title = "Two-Week Meal Plan"
+                elif days < 7:
+                    title = f"{days}-Day Meal Plan"
+                else:
+                    title = f"{days}-Day Meal Plan"
+
+            # Capitalize and ensure reasonable length
+            title = title.strip()
+            if len(title) > 50:
+                title = title[:47] + "..."
+
+            return title
+
+        except Exception as e:
+            logger.error(f"Title generation failed: {e}")
+            # Fallback to simple title
+            days = requirements.get('days', 7)
+            return f"{days}-Day Meal Plan"
 
 
 class NutritionAnalysisTool(BaseTool):

@@ -4,7 +4,7 @@ import { AgentActivityPanel } from '../components/AgentActivityPanel';
 import { MealPlanDetailModal } from '../components/MealPlanDetailModal';
 import type { MealPlan, AgentActivityEvent } from '../types';
 
-export function CalendarPage() {
+export function MealPlansPage() {
   const [mealPlans, setMealPlans] = useState<MealPlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -56,26 +56,20 @@ export function CalendarPage() {
     streamRef.current = null;
   };
 
-  // Generate week days for display
-  const getWeekDays = () => {
-    const days = [];
-    const today = new Date();
-    for (let i = 0; i < 7; i++) {
-      const date = new Date(today);
-      date.setDate(today.getDate() + i);
-      days.push(date);
+  const handleActivate = async (planId: number, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent opening the detail modal
+    try {
+      await mealPlanApi.activate(planId);
+      await loadMealPlans(); // Reload to show updated active status
+    } catch (err) {
+      console.error('Failed to activate meal plan:', err);
     }
-    return days;
   };
 
-  const weekDays = getWeekDays();
-
-  const formatDay = (date: Date) => {
-    return date.toLocaleDateString('en-US', { weekday: 'short' });
-  };
-
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const getDayCount = (plan: MealPlan) => {
+    if (!plan.meals || plan.meals.length === 0) return 0;
+    const dayNumbers = plan.meals.map(m => m.day_number);
+    return Math.max(...dayNumbers);
   };
 
   return (
@@ -84,9 +78,9 @@ export function CalendarPage() {
       <header className="bg-white border-b border-cream-300 px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-display font-bold text-sage-800">Meal Planning</h1>
+            <h1 className="text-2xl font-display font-bold text-sage-800">Meal Plans</h1>
             <p className="text-sage-600 text-sm mt-1">
-              Plan your meals for the week
+              Manage and organize your meal plans
             </p>
           </div>
         </div>
@@ -192,47 +186,6 @@ export function CalendarPage() {
           </button>
         </div>
 
-        {/* Week View */}
-        <div className="bg-white rounded-xl shadow-sm border border-cream-200 overflow-hidden mb-8">
-          <div className="grid grid-cols-7 border-b border-cream-200">
-            {weekDays.map((date, idx) => (
-              <div
-                key={idx}
-                className={`p-4 text-center border-r border-cream-200 last:border-r-0 ${
-                  idx === 0 ? 'bg-sage-50' : ''
-                }`}
-              >
-                <div className="text-sm font-medium text-sage-600">{formatDay(date)}</div>
-                <div className="text-lg font-bold text-sage-800">{formatDate(date)}</div>
-              </div>
-            ))}
-          </div>
-
-          {/* Meal slots */}
-          {['Breakfast', 'Lunch', 'Dinner'].map((mealType) => (
-            <div key={mealType} className="grid grid-cols-7 border-b border-cream-200 last:border-b-0">
-              {weekDays.map((date, idx) => (
-                <div
-                  key={idx}
-                  className={`p-3 min-h-[100px] border-r border-cream-200 last:border-r-0 ${
-                    idx === 0 ? 'bg-sage-50' : ''
-                  }`}
-                >
-                  {idx === 0 && (
-                    <div className="text-xs font-medium text-sage-500 mb-2">{mealType}</div>
-                  )}
-                  <div className="text-xs text-sage-400 italic">
-                    {/* Placeholder for meal */}
-                    {idx === 0 && mealType === 'Breakfast' && 'Oatmeal with berries'}
-                    {idx === 0 && mealType === 'Lunch' && 'Grilled chicken salad'}
-                    {idx === 0 && mealType === 'Dinner' && 'Pasta primavera'}
-                  </div>
-                </div>
-              ))}
-            </div>
-          ))}
-        </div>
-
         {/* Existing Meal Plans */}
         {mealPlans.length > 0 && (
           <div>
@@ -241,14 +194,23 @@ export function CalendarPage() {
               {mealPlans.map((plan) => (
                 <div
                   key={plan.id}
-                  className="bg-white rounded-xl shadow-sm border border-cream-200 p-6 hover:shadow-lg transition-all hover:border-sage-300 cursor-pointer"
+                  className={`bg-white rounded-xl shadow-sm border p-6 hover:shadow-lg transition-all cursor-pointer ${
+                    plan.is_active ? 'border-terracotta-400 ring-2 ring-terracotta-200' : 'border-cream-200 hover:border-sage-300'
+                  }`}
                   onClick={() => setSelectedMealPlanId(plan.id)}
                 >
-                  <h3 className="text-lg font-display font-bold text-sage-800 mb-2">
-                    {plan.name || `Meal Plan #${plan.id}`}
-                  </h3>
+                  <div className="flex items-start justify-between mb-2">
+                    <h3 className="text-lg font-display font-bold text-sage-800 flex-1">
+                      {plan.name || `Meal Plan #${plan.id}`}
+                    </h3>
+                    {plan.is_active && (
+                      <span className="px-2 py-0.5 bg-terracotta-500 text-white rounded text-xs font-medium">
+                        Active
+                      </span>
+                    )}
+                  </div>
                   <div className="text-sm text-sage-600 space-y-1">
-                    <p>📅 {plan.start_date} - {plan.end_date}</p>
+                    <p>📅 {getDayCount(plan)}-day plan</p>
                     <p>👥 {plan.people_count} people</p>
                     <p>🍽️ {plan.meals?.length || 0} meals planned</p>
                   </div>
@@ -264,13 +226,21 @@ export function CalendarPage() {
                       ))}
                     </div>
                   )}
-                  <div className="mt-4 pt-4 border-t border-cream-200">
+                  <div className="mt-4 pt-4 border-t border-cream-200 flex items-center justify-between">
                     <button className="text-sage-600 hover:text-sage-700 text-sm font-medium flex items-center gap-1">
                       View Details
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                       </svg>
                     </button>
+                    {!plan.is_active && (
+                      <button
+                        onClick={(e) => handleActivate(plan.id, e)}
+                        className="px-3 py-1 bg-terracotta-500 hover:bg-terracotta-600 text-white rounded text-xs font-medium transition-colors"
+                      >
+                        Set Active
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}

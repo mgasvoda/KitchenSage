@@ -142,6 +142,35 @@ async def create_meal_plan(
     return result
 
 
+@router.post("/{meal_plan_id}/activate", response_model=dict)
+async def activate_meal_plan(meal_plan_id: int):
+    """
+    Set a meal plan as the active plan.
+
+    Automatically deactivates all other meal plans.
+    Only one meal plan can be active at a time.
+    """
+    service = MealPlanService()
+    result = service.set_active_meal_plan(meal_plan_id)
+
+    if result.get("status") == "error":
+        raise HTTPException(status_code=404, detail=result.get("message", "Meal plan not found"))
+
+    return result
+
+
+@router.get("/active", response_model=dict)
+async def get_active_meal_plan():
+    """
+    Get the currently active meal plan.
+
+    Returns the active meal plan with all meals and recipes, or None if no plan is active.
+    """
+    service = MealPlanService()
+    result = service.get_active_meal_plan()
+    return result
+
+
 @router.delete("/{meal_plan_id}", response_model=dict)
 async def delete_meal_plan(meal_plan_id: int):
     """
@@ -149,9 +178,9 @@ async def delete_meal_plan(meal_plan_id: int):
     """
     service = MealPlanService()
     result = service.delete_meal_plan(meal_plan_id)
-    
+
     if result.get("status") == "error":
         raise HTTPException(status_code=404, detail=result.get("message", "Meal plan not found"))
-    
+
     return result
 

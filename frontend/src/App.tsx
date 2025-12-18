@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Layout } from './components/layout';
-import { ChatPage, RecipesPage, GroceryPage, CalendarPage, DiscoverPage } from './pages';
+import { ChatPage, RecipesPage, GroceryPage, MealPlansPage, DiscoverPage } from './pages';
 
 function App() {
   return (
@@ -12,7 +12,7 @@ function App() {
           <Route path="discover" element={<DiscoverPage />} />
           <Route path="recipes" element={<RecipesPage />} />
           <Route path="grocery" element={<GroceryPage />} />
-          <Route path="calendar" element={<CalendarPage />} />
+          <Route path="meal-plans" element={<MealPlansPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

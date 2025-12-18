@@ -343,3 +343,73 @@ class MealPlanService:
                 "message": str(e),
             }
 
+    def set_active_meal_plan(self, meal_plan_id: int) -> Dict[str, Any]:
+        """
+        Set a meal plan as the active plan.
+
+        Automatically deactivates all other meal plans.
+
+        Args:
+            meal_plan_id: Meal plan ID to activate
+
+        Returns:
+            Dictionary with activated meal plan or error
+        """
+        try:
+            meal_plan = self.meal_plan_repo.set_active_meal_plan(meal_plan_id)
+
+            if meal_plan is None:
+                return {
+                    "status": "error",
+                    "message": f"Meal plan with ID {meal_plan_id} not found",
+                }
+
+            return {
+                "status": "success",
+                "message": "Meal plan activated successfully",
+                "meal_plan": meal_plan.model_dump() if hasattr(meal_plan, 'model_dump') else meal_plan.__dict__,
+            }
+
+        except RecordNotFoundError as e:
+            logger.error(f"Meal plan {meal_plan_id} not found: {e}")
+            return {
+                "status": "error",
+                "message": f"Meal plan with ID {meal_plan_id} not found",
+            }
+
+        except Exception as e:
+            logger.error(f"Error activating meal plan {meal_plan_id}: {e}")
+            return {
+                "status": "error",
+                "message": str(e),
+            }
+
+    def get_active_meal_plan(self) -> Dict[str, Any]:
+        """
+        Get the currently active meal plan.
+
+        Returns:
+            Dictionary with active meal plan or None
+        """
+        try:
+            meal_plan = self.meal_plan_repo.get_active_meal_plan()
+
+            if meal_plan is None:
+                return {
+                    "status": "success",
+                    "message": "No active meal plan",
+                    "meal_plan": None,
+                }
+
+            return {
+                "status": "success",
+                "meal_plan": meal_plan.model_dump() if hasattr(meal_plan, 'model_dump') else meal_plan.__dict__,
+            }
+
+        except Exception as e:
+            logger.error(f"Error getting active meal plan: {e}")
+            return {
+                "status": "error",
+                "message": str(e),
+            }
+
