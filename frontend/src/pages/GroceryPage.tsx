@@ -28,14 +28,16 @@ export function GroceryPage() {
 
   const handleToggleItem = async (itemId: number, checked: boolean) => {
     if (!groceryList) return;
-    
+
     try {
       await groceryListApi.updateItem(groceryList.id, itemId, checked);
       // Update local state
       setGroceryList({
         ...groceryList,
         items: groceryList.items.map(item =>
-          item.id === itemId ? { ...item, checked } : item
+          item.id === itemId
+            ? { ...item, purchased: checked, status: checked ? 'purchased' : 'needed' }
+            : item
         ),
       });
     } catch (err) {
@@ -78,11 +80,18 @@ export function GroceryPage() {
 
   const groupItemsByCategory = (items: GroceryItem[]) => {
     return items.reduce((acc, item) => {
-      const category = item.category || 'Other';
-      if (!acc[category]) acc[category] = [];
-      acc[category].push(item);
+      const category = item.ingredient?.category || 'other';
+      // Capitalize first letter for display
+      const displayCategory = category.charAt(0).toUpperCase() + category.slice(1).replace('_', ' ');
+      if (!acc[displayCategory]) acc[displayCategory] = [];
+      acc[displayCategory].push(item);
       return acc;
     }, {} as Record<string, GroceryItem[]>);
+  };
+
+  // Helper to check if an item is checked/purchased
+  const isItemChecked = (item: GroceryItem) => {
+    return item.purchased || item.status === 'purchased';
   };
 
   const getCategoryIcon = (category: string) => {
@@ -96,6 +105,8 @@ export function GroceryPage() {
         return '🥩';
       case 'bakery':
         return '🍞';
+      case 'baking':
+        return '🧁';
       case 'frozen':
         return '🧊';
       case 'pantry':
@@ -110,12 +121,19 @@ export function GroceryPage() {
         return '🧂';
       case 'condiments':
         return '🍯';
+      case 'nuts seeds':
+      case 'nuts_seeds':
+        return '🥜';
+      case 'legumes':
+        return '🫘';
+      case 'canned':
+        return '🥫';
       default:
         return '📦';
     }
   };
 
-  const checkedCount = groceryList?.items?.filter(i => i.checked).length || 0;
+  const checkedCount = groceryList?.items?.filter(i => isItemChecked(i)).length || 0;
   const totalCount = groceryList?.items?.length || 0;
   const hasCheckedItems = checkedCount > 0;
   const hasItems = totalCount > 0;
@@ -222,22 +240,25 @@ export function GroceryPage() {
                       <span className="text-sage-400 font-normal">({items.length})</span>
                     </h3>
                     <ul className="space-y-2">
-                      {items.map((item) => (
-                        <li key={item.id} className="flex items-center gap-3 group">
-                          <input
-                            type="checkbox"
-                            checked={item.checked}
-                            onChange={(e) => handleToggleItem(item.id, e.target.checked)}
-                            className="w-5 h-5 rounded border-cream-300 text-sage-600 focus:ring-sage-500 cursor-pointer"
-                          />
-                          <span className={`flex-1 transition-colors ${item.checked ? 'line-through text-sage-400' : 'text-sage-700'}`}>
-                            {item.ingredient_name}
-                          </span>
-                          <span className={`text-sm transition-colors ${item.checked ? 'text-sage-300' : 'text-sage-500'}`}>
-                            {item.quantity} {item.unit}
-                          </span>
-                        </li>
-                      ))}
+                      {items.map((item) => {
+                        const checked = isItemChecked(item);
+                        return (
+                          <li key={item.id} className="flex items-center gap-3 group">
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={(e) => handleToggleItem(item.id, e.target.checked)}
+                              className="w-5 h-5 rounded border-cream-300 text-sage-600 focus:ring-sage-500 cursor-pointer"
+                            />
+                            <span className={`flex-1 transition-colors ${checked ? 'line-through text-sage-400' : 'text-sage-700'}`}>
+                              {item.ingredient?.name || 'Unknown ingredient'}
+                            </span>
+                            <span className={`text-sm transition-colors ${checked ? 'text-sage-300' : 'text-sage-500'}`}>
+                              {item.quantity} {item.unit}
+                            </span>
+                          </li>
+                        );
+                      })}
                     </ul>
                   </div>
                 ))}

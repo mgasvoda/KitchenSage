@@ -85,23 +85,43 @@ export interface MealPlan {
 }
 
 // Grocery List types
+export interface GroceryIngredient {
+  id: number;
+  name: string;
+  category: string;
+  common_unit?: string;
+}
+
 export interface GroceryItem {
   id: number;
+  grocery_list_id: number;
   ingredient_id: number;
-  ingredient_name: string;
+  ingredient: GroceryIngredient;
   quantity: number;
   unit: string;
-  category: string;
-  checked: boolean;
+  estimated_price?: number;
+  actual_price?: number;
+  status: 'needed' | 'in_cart' | 'purchased' | 'unavailable';
+  store_section?: string;
+  preferred_brand?: string;
+  substitutes: string[];
+  notes?: string;
+  // Virtual field for UI compatibility
+  purchased?: boolean;
 }
 
 export interface GroceryList {
   id: number;
-  meal_plan_id: number;
+  meal_plan_id?: number;
+  name?: string;
   items: GroceryItem[];
-  estimated_cost?: number;
-  created_at?: string;
+  estimated_total?: number;
+  actual_total?: number;
+  budget_limit?: number;
+  store_preferences?: string[];
   completed: boolean;
+  created_at?: string;
+  completed_at?: string;
 }
 
 // Chat types
