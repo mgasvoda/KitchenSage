@@ -3,10 +3,11 @@ Grocery service - business logic layer for grocery list operations.
 """
 
 import logging
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 
 from src.database import GroceryRepository, RecipeRepository, MealPlanRepository, DatabaseError, RecordNotFoundError
 from src.crew import KitchenCrew
+from src.services.consolidation_service import GroceryConsolidationService
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,7 @@ class GroceryService:
         self._recipe_repo = None
         self._meal_plan_repo = None
         self._kitchen_crew = None
+        self._consolidation_service = None
     
     @property
     def grocery_repo(self) -> GroceryRepository:
@@ -52,7 +54,14 @@ class GroceryService:
         if self._kitchen_crew is None:
             self._kitchen_crew = KitchenCrew()
         return self._kitchen_crew
-    
+
+    @property
+    def consolidation_service(self) -> GroceryConsolidationService:
+        """Lazy initialization of consolidation service."""
+        if self._consolidation_service is None:
+            self._consolidation_service = GroceryConsolidationService()
+        return self._consolidation_service
+
     def list_grocery_lists(
         self,
         limit: int = 20,
@@ -284,14 +293,14 @@ class GroceryService:
     ) -> Dict[str, Any]:
         """
         Add ingredients from a recipe to the grocery list.
-        
-        Gets or creates the default grocery list, then merges recipe
-        ingredients into it.
-        
+
+        Gets or creates the default grocery list, consolidates ingredients
+        using LLM, then merges them into the list.
+
         Args:
             recipe_id: ID of the recipe
             servings: Number of servings (uses recipe default if not provided)
-            
+
         Returns:
             Dictionary with result and updated grocery list
         """
@@ -303,42 +312,59 @@ class GroceryService:
                     "status": "error",
                     "message": f"Recipe with ID {recipe_id} not found",
                 }
-            
+
             # Get or create the grocery list
             grocery_list = self.grocery_repo.get_or_create_default_list()
-            
+
             # Calculate serving multiplier
             recipe_servings = recipe.servings or 1
             target_servings = servings or recipe_servings
             multiplier = target_servings / recipe_servings
-            
-            # Add each ingredient to the list
-            items_added = 0
+
+            # Collect raw items first
+            raw_items: List[Dict[str, Any]] = []
             for recipe_ingredient in recipe.ingredients:
                 if not recipe_ingredient.ingredient_id:
                     continue
-                
+
                 adjusted_quantity = recipe_ingredient.quantity * multiplier
                 unit_value = recipe_ingredient.unit.value if hasattr(recipe_ingredient.unit, 'value') else str(recipe_ingredient.unit)
-                
+
+                raw_items.append({
+                    'name': recipe_ingredient.ingredient.name if recipe_ingredient.ingredient else 'Unknown',
+                    'quantity': adjusted_quantity,
+                    'unit': unit_value,
+                    'ingredient_id': recipe_ingredient.ingredient_id
+                })
+
+            # Consolidate using LLM (gracefully falls back to raw items on error)
+            consolidated_items = self.consolidation_service.consolidate_ingredients(raw_items)
+
+            # Add consolidated items to the list
+            items_added = 0
+            for item in consolidated_items:
+                ingredient_id = item.get('ingredient_id')
+                if not ingredient_id:
+                    continue
+
                 self.grocery_repo.add_or_merge_item(
                     grocery_list_id=grocery_list.id,
-                    ingredient_id=recipe_ingredient.ingredient_id,
-                    quantity=adjusted_quantity,
-                    unit=unit_value
+                    ingredient_id=ingredient_id,
+                    quantity=item.get('quantity', 0),
+                    unit=item.get('unit', 'piece')
                 )
                 items_added += 1
-            
+
             # Get updated list
             updated_list = self.grocery_repo.get_or_create_default_list()
             list_dict = updated_list.model_dump() if hasattr(updated_list, 'model_dump') else dict(updated_list)
-            
+
             return {
                 "status": "success",
                 "message": f"Added {items_added} ingredients from '{recipe.name}' to grocery list",
                 "grocery_list": list_dict,
             }
-            
+
         except Exception as e:
             logger.error(f"Error adding recipe ingredients: {e}")
             return {
@@ -349,13 +375,13 @@ class GroceryService:
     def add_meal_plan_ingredients(self, meal_plan_id: int) -> Dict[str, Any]:
         """
         Add all ingredients from a meal plan to the grocery list.
-        
-        Gets or creates the default grocery list, then merges all
-        recipe ingredients from the meal plan into it.
-        
+
+        Gets or creates the default grocery list, consolidates all ingredients
+        using LLM, then merges them into the list.
+
         Args:
             meal_plan_id: ID of the meal plan
-            
+
         Returns:
             Dictionary with result and updated grocery list
         """
@@ -367,39 +393,55 @@ class GroceryService:
                     "status": "error",
                     "message": f"Meal plan with ID {meal_plan_id} not found",
                 }
-            
+
             # Get or create the grocery list
             grocery_list = self.grocery_repo.get_or_create_default_list()
-            
-            # Track items added
-            items_added = 0
-            
-            # Process each meal
+
+            # Collect all raw items from all meals first
+            raw_items: List[Dict[str, Any]] = []
+
             for meal in meal_plan.meals:
                 if not meal.recipe or not meal.recipe.ingredients:
                     continue
-                
+
                 # Calculate serving multiplier for this meal
                 effective_servings = meal.get_effective_servings() if hasattr(meal, 'get_effective_servings') else (meal.servings_override or meal.recipe.servings)
                 recipe_servings = meal.recipe.servings or 1
                 multiplier = effective_servings / recipe_servings
-                
-                # Add each ingredient
+
+                # Collect each ingredient
                 for recipe_ingredient in meal.recipe.ingredients:
                     if not recipe_ingredient.ingredient_id:
                         continue
-                    
+
                     adjusted_quantity = recipe_ingredient.quantity * multiplier
                     unit_value = recipe_ingredient.unit.value if hasattr(recipe_ingredient.unit, 'value') else str(recipe_ingredient.unit)
-                    
-                    self.grocery_repo.add_or_merge_item(
-                        grocery_list_id=grocery_list.id,
-                        ingredient_id=recipe_ingredient.ingredient_id,
-                        quantity=adjusted_quantity,
-                        unit=unit_value
-                    )
-                    items_added += 1
-            
+
+                    raw_items.append({
+                        'name': recipe_ingredient.ingredient.name if recipe_ingredient.ingredient else 'Unknown',
+                        'quantity': adjusted_quantity,
+                        'unit': unit_value,
+                        'ingredient_id': recipe_ingredient.ingredient_id
+                    })
+
+            # Consolidate using LLM (gracefully falls back to raw items on error)
+            consolidated_items = self.consolidation_service.consolidate_ingredients(raw_items)
+
+            # Add consolidated items to the list
+            items_added = 0
+            for item in consolidated_items:
+                ingredient_id = item.get('ingredient_id')
+                if not ingredient_id:
+                    continue
+
+                self.grocery_repo.add_or_merge_item(
+                    grocery_list_id=grocery_list.id,
+                    ingredient_id=ingredient_id,
+                    quantity=item.get('quantity', 0),
+                    unit=item.get('unit', 'piece')
+                )
+                items_added += 1
+
             # Get updated list
             updated_list = self.grocery_repo.get_or_create_default_list()
             list_dict = updated_list.model_dump() if hasattr(updated_list, 'model_dump') else dict(updated_list)
