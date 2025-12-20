@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
-import { mealPlanApi } from '../services/api';
+import { mealPlanApi, groceryListApi } from '../services/api';
 import { AgentActivityPanel } from '../components/AgentActivityPanel';
 import { MealPlanDetailModal } from '../components/MealPlanDetailModal';
 import type { MealPlan, AgentActivityEvent } from '../types';
+import { useNavigate } from 'react-router-dom';
+import { getDefaultPeopleCount } from '../services/settings';
 
 export function MealPlansPage() {
   const [mealPlans, setMealPlans] = useState<MealPlan[]>([]);
@@ -11,13 +13,20 @@ export function MealPlansPage() {
   const [showCreatePanel, setShowCreatePanel] = useState(false);
   const [eventStream, setEventStream] = useState<AsyncGenerator<AgentActivityEvent> | null>(null);
   const [createForm, setCreateForm] = useState({
-    days: 7,
-    people: 2,
     prompt: '',
     budget: undefined as number | undefined,
   });
   const [selectedMealPlanId, setSelectedMealPlanId] = useState<number | null>(null);
   const streamRef = useRef<AsyncGenerator<AgentActivityEvent> | null>(null);
+  const navigate = useNavigate();
+
+  const [toast, setToast] = useState<{
+    type: 'info' | 'success' | 'error';
+    message: string;
+    actionLabel?: string;
+    onAction?: () => void;
+    dismissAfterMs?: number;
+  } | null>(null);
 
   useEffect(() => {
     loadMealPlans();
@@ -38,16 +47,21 @@ export function MealPlansPage() {
 
   const handleStartCreate = () => {
     // Start the streaming meal plan creation
-    const stream = mealPlanApi.streamCreate(createForm);
+    const stream = mealPlanApi.streamCreate({
+      prompt: createForm.prompt,
+      budget: createForm.budget,
+      people: getDefaultPeopleCount(),
+      // days intentionally omitted; inferred from prompt server-side
+    });
     streamRef.current = stream;
     setEventStream(stream);
     setShowCreatePanel(true);
   };
 
-  const handlePanelComplete = async (mealPlan: string) => {
+  const handlePanelComplete = async (_mealPlan: string) => {
     // Reload meal plans after completion
     await loadMealPlans();
-    setCreateForm({ days: 7, people: 2, prompt: '', budget: undefined });
+    setCreateForm({ prompt: '', budget: undefined });
   };
 
   const handlePanelClose = () => {
@@ -70,6 +84,45 @@ export function MealPlansPage() {
     if (!plan.meals || plan.meals.length === 0) return 0;
     const dayNumbers = plan.meals.map(m => m.day_number);
     return Math.max(...dayNumbers);
+  };
+
+  const showToast = (next: {
+    type: 'info' | 'success' | 'error';
+    message: string;
+    actionLabel?: string;
+    onAction?: () => void;
+    dismissAfterMs?: number;
+  }) => {
+    setToast(next);
+    if (next.dismissAfterMs && next.dismissAfterMs > 0) {
+      window.setTimeout(() => setToast((current) => (current === next ? null : current)), next.dismissAfterMs);
+    }
+  };
+
+  const handleAddMealPlanToGroceryList = async (mealPlanId: number) => {
+    const plan = mealPlans.find(p => p.id === mealPlanId);
+
+    showToast({
+      type: 'info',
+      message: `Adding ${plan?.name || 'meal plan'} to your grocery list…`,
+    });
+
+    try {
+      const response = await groceryListApi.addFromMealPlan(mealPlanId);
+      showToast({
+        type: 'success',
+        message: response.message || 'Added to grocery list!',
+        actionLabel: 'View grocery list',
+        onAction: () => navigate('/grocery'),
+        dismissAfterMs: 5000,
+      });
+    } catch (err) {
+      showToast({
+        type: 'error',
+        message: err instanceof Error ? err.message : 'Failed to add to grocery list',
+        dismissAfterMs: 7000,
+      });
+    }
   };
 
   return (
@@ -116,33 +169,17 @@ export function MealPlansPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            <div>
-              <label className="block text-sm font-medium text-sage-100 mb-1">
-                Days
-              </label>
-              <input
-                type="number"
-                min={1}
-                max={30}
-                value={createForm.days}
-                onChange={(e) => setCreateForm({ ...createForm, days: parseInt(e.target.value) || 7 })}
-                className="w-full px-4 py-2.5 bg-white/10 border border-white/20 rounded-lg text-white placeholder-sage-200 focus:outline-none focus:ring-2 focus:ring-white/30"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-sage-100 mb-1">
-                People
-              </label>
-              <input
-                type="number"
-                min={1}
-                max={20}
-                value={createForm.people}
-                onChange={(e) => setCreateForm({ ...createForm, people: parseInt(e.target.value) || 2 })}
-                className="w-full px-4 py-2.5 bg-white/10 border border-white/20 rounded-lg text-white placeholder-sage-200 focus:outline-none focus:ring-2 focus:ring-white/30"
-              />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <div className="md:col-span-1">
+              <div className="text-sm font-medium text-sage-100 mb-1">
+                Planning for
+              </div>
+              <div className="px-4 py-2.5 bg-white/10 border border-white/20 rounded-lg text-white">
+                {getDefaultPeopleCount()} people
+              </div>
+              <p className="text-xs text-sage-200 mt-2">
+                Change this in Settings.
+              </p>
             </div>
 
             <div>
@@ -271,15 +308,72 @@ export function MealPlansPage() {
         onClose={handlePanelClose}
         onComplete={handlePanelComplete}
         eventStream={eventStream}
-        planConfig={createForm}
+        planConfig={{
+          people: getDefaultPeopleCount(),
+          prompt: createForm.prompt,
+          budget: createForm.budget,
+        }}
       />
 
-      {/* Meal Plan Detail Modal - always rendered to preserve polling state */}
-      <MealPlanDetailModal
-        isOpen={selectedMealPlanId !== null}
-        onClose={() => setSelectedMealPlanId(null)}
-        mealPlanId={selectedMealPlanId ?? 0}
-      />
+      {/* Meal Plan Detail Modal */}
+      {selectedMealPlanId && (
+        <MealPlanDetailModal
+          isOpen={selectedMealPlanId !== null}
+          onClose={() => setSelectedMealPlanId(null)}
+          mealPlanId={selectedMealPlanId}
+          onAddToGroceryList={handleAddMealPlanToGroceryList}
+        />
+      )}
+
+      {/* Lightweight toast (no external deps) */}
+      {toast && (
+        <div className="fixed bottom-4 right-4 z-[60] max-w-sm w-[calc(100vw-2rem)]">
+          <div
+            className={`rounded-xl shadow-xl border px-4 py-3 bg-white flex items-start gap-3 ${
+              toast.type === 'success'
+                ? 'border-green-200'
+                : toast.type === 'error'
+                  ? 'border-red-200'
+                  : 'border-sage-200'
+            }`}
+            role="status"
+            aria-live="polite"
+          >
+            <div className="mt-1">
+              {toast.type === 'info' ? (
+                <div className="animate-spin rounded-full h-4 w-4 border-2 border-sage-600 border-t-transparent" />
+              ) : toast.type === 'success' ? (
+                <div className="h-4 w-4 rounded-full bg-green-500" />
+              ) : (
+                <div className="h-4 w-4 rounded-full bg-red-500" />
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm text-sage-800">{toast.message}</p>
+              {toast.actionLabel && toast.onAction && (
+                <button
+                  onClick={() => {
+                    toast.onAction?.();
+                    setToast(null);
+                  }}
+                  className="mt-2 text-sm font-medium text-sage-700 hover:text-sage-800 underline underline-offset-2"
+                >
+                  {toast.actionLabel}
+                </button>
+              )}
+            </div>
+            <button
+              onClick={() => setToast(null)}
+              className="text-sage-500 hover:text-sage-700 rounded-lg p-1"
+              aria-label="Dismiss notification"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

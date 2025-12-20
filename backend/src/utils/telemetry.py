@@ -14,6 +14,32 @@ load_dotenv()
 
 logger = logging.getLogger(__name__)
 
+_DEFAULT_PHOENIX_CLOUD_BASE = "https://app.phoenix.arize.com"
+_DEFAULT_PHOENIX_TRACES_PATH = "/v1/traces"
+
+
+def _normalize_phoenix_collector_endpoint(endpoint: str) -> str:
+    """
+    Normalize a Phoenix collector endpoint to an OTEL traces ingest URL.
+
+    Phoenix Cloud (and many self-hosted Phoenix setups) expect OTEL HTTP exports
+    to hit the `/v1/traces` endpoint. Historically, users often configure the
+    base URL (e.g. https://app.phoenix.arize.com); this helper upgrades that to
+    a full ingest URL without breaking already-correct values.
+    """
+    if not endpoint:
+        return endpoint
+
+    # Strip trailing slash for consistent checks.
+    trimmed = endpoint.rstrip("/")
+
+    # If a caller already provided an explicit path, respect it.
+    if "/v1/traces" in trimmed:
+        return trimmed
+
+    # Otherwise, assume Phoenix expects the standard traces ingest path.
+    return f"{trimmed}{_DEFAULT_PHOENIX_TRACES_PATH}"
+
 
 def initialize_phoenix_tracing(project_name: str = "kitchencrew") -> Optional[object]:
     """
@@ -37,23 +63,23 @@ def initialize_phoenix_tracing(project_name: str = "kitchencrew") -> Optional[ob
             logger.warning("PHOENIX_API_KEY appears to be a placeholder. Skipping Phoenix tracing initialization.")
             return None
         
-        # Use custom collector endpoint if provided, otherwise use default
-        collector_endpoint = os.getenv('PHOENIX_COLLECTOR_ENDPOINT')
-        if not collector_endpoint:
-            collector_endpoint = "https://app.phoenix.arize.com"
+        # Set Phoenix environment variables (do not overwrite explicit user config)
+        os.environ.setdefault("PHOENIX_COLLECTOR_ENDPOINT", _DEFAULT_PHOENIX_CLOUD_BASE)
+
+        collector_endpoint = _normalize_phoenix_collector_endpoint(
+            os.getenv("PHOENIX_COLLECTOR_ENDPOINT", _DEFAULT_PHOENIX_CLOUD_BASE)
+        )
 
         # Import and register Phoenix tracing
         from phoenix.otel import register
 
         # Configure the Phoenix tracer with auto-instrumentation
-        # Pass endpoint and headers directly to register() instead of env vars
+        # Pass headers explicitly to ensure auth is properly configured
         tracer_provider = register(
             project_name=project_name,
             endpoint=collector_endpoint,
-            headers={"Authorization": f"Bearer {phoenix_api_key}"},
-            protocol="http/protobuf",  # Explicit protocol for HTTPS endpoints
-            auto_instrument=True,  # Auto-instrument based on installed OI dependencies
-            batch=True  # Use batch processing for production
+            headers={"api_key": phoenix_api_key},
+            auto_instrument=True  # Auto-instrument based on installed OI dependencies
         )
         
         logger.info(f"Phoenix tracing initialized successfully for project: {project_name}")

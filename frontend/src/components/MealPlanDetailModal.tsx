@@ -14,12 +14,18 @@ interface MealPlanDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
   mealPlanId: number;
+  /**
+   * Optional override to handle "Add to Grocery List" outside the modal.
+   * When provided, the modal will close immediately and this handler will run.
+   */
+  onAddToGroceryList?: (mealPlanId: number) => Promise<void> | void;
 }
 
 export function MealPlanDetailModal({
   isOpen,
   onClose,
   mealPlanId,
+  onAddToGroceryList,
 }: MealPlanDetailModalProps) {
   const [mealPlan, setMealPlan] = useState<MealPlan | null>(null);
   const [loading, setLoading] = useState(true);
@@ -119,6 +125,18 @@ export function MealPlanDetailModal({
   const handleGenerateGroceryList = async () => {
     if (!mealPlan) return;
 
+    // If the parent wants to own this workflow (toast, background processing),
+    // close immediately and kick off the work outside the modal.
+    if (onAddToGroceryList) {
+      onClose();
+      try {
+        await onAddToGroceryList(mealPlan.id);
+      } catch {
+        // Parent handler is responsible for user feedback.
+      }
+      return;
+    }
+    
     try {
       // Start the async task
       const response = await groceryListApi.addFromMealPlan(mealPlan.id);
@@ -308,9 +326,13 @@ export function MealPlanDetailModal({
                 onClick={handleGenerateGroceryList}
                 className="px-4 py-2 bg-sage-600 text-white rounded-lg hover:bg-sage-700 transition-colors font-medium flex items-center gap-2"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                </svg>
+                {generatingGroceryList && !onAddToGroceryList ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                ) : (
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                  </svg>
+                )}
                 Add to Grocery List
               </button>
             )}

@@ -3,6 +3,7 @@ Meal Plan API endpoints.
 """
 
 import json
+import re
 from typing import Optional, List, AsyncGenerator
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
@@ -12,9 +13,72 @@ from src.services import MealPlanService
 
 router = APIRouter()
 
+_DAYS_MIN = 1
+_DAYS_MAX = 30
+
+
+def _clamp_days(days: int) -> int:
+    return max(_DAYS_MIN, min(_DAYS_MAX, days))
+
+
+def infer_days_from_prompt(prompt: Optional[str]) -> Optional[int]:
+    """
+    Infer number of days from a free-form prompt.
+
+    Supported examples:
+    - "for 5 days", "5 days"
+    - "5-day plan"
+    - "next 2 weeks", "for 2 weeks"
+    - "a week", "one week", "this week"
+    - "weekend"
+    """
+    if not prompt:
+        return None
+
+    text = prompt.lower()
+
+    # Avoid treating "weeknight" as "week"
+    text = text.replace("weeknights", "wk_nights").replace("weeknight", "wk_night")
+
+    if re.search(r"\bweekend\b", text):
+        return 2
+
+    # "next 2 weeks", "for 2 weeks", "2 weeks"
+    m = re.search(r"\b(?:next|for)?\s*(\d+)\s*weeks?\b", text)
+    if m:
+        return int(m.group(1)) * 7
+
+    # "a week", "one week", "this week"
+    if re.search(r"\b(a|one|this)\s+week\b", text):
+        return 7
+
+    # "for 5 days", "5 days"
+    m = re.search(r"\b(?:for|next)?\s*(\d+)\s*days?\b", text)
+    if m:
+        return int(m.group(1))
+
+    # "5-day"
+    m = re.search(r"\b(\d+)\s*-\s*day\b", text)
+    if m:
+        return int(m.group(1))
+
+    return None
+
+
+def resolve_days(days: Optional[int], prompt: Optional[str], fallback_days: int = 7) -> int:
+    """
+    Resolve final days value from explicit param or prompt inference.
+    """
+    if days is not None:
+        return _clamp_days(days)
+    inferred = infer_days_from_prompt(prompt)
+    if inferred is None:
+        return _clamp_days(fallback_days)
+    return _clamp_days(inferred)
+
 
 async def generate_meal_plan_sse_stream(
-    days: int,
+    days: Optional[int],
     people: int,
     prompt: Optional[str],
     budget: Optional[float],
@@ -27,10 +91,11 @@ async def generate_meal_plan_sse_stream(
     """
     service = MealPlanService()
     stream = None
+    resolved_days = resolve_days(days, prompt)
     
     try:
         stream = service.create_meal_plan_stream(
-            days=days,
+            days=resolved_days,
             people=people,
             prompt=prompt,
             budget=budget,
@@ -55,7 +120,7 @@ async def generate_meal_plan_sse_stream(
 
 @router.post("/stream", response_class=StreamingResponse)
 async def create_meal_plan_stream(
-    days: int = Query(7, ge=1, le=30, description="Number of days for the meal plan"),
+    days: Optional[int] = Query(None, ge=1, le=30, description="Number of days for the meal plan (optional; inferred from prompt if omitted)"),
     people: int = Query(2, ge=1, le=20, description="Number of people to plan for"),
     prompt: Optional[str] = Query(None, description="Free-form preferences and instructions for the meal plan"),
     budget: Optional[float] = Query(None, ge=0, description="Budget constraint"),
@@ -117,7 +182,7 @@ async def get_meal_plan(meal_plan_id: int):
 
 @router.post("", response_model=dict, status_code=201)
 async def create_meal_plan(
-    days: int = Query(7, ge=1, le=30, description="Number of days for the meal plan"),
+    days: Optional[int] = Query(None, ge=1, le=30, description="Number of days for the meal plan (optional; inferred from prompt if omitted)"),
     people: int = Query(2, ge=1, le=20, description="Number of people to plan for"),
     prompt: Optional[str] = Query(None, description="Free-form preferences and instructions for the meal plan"),
     budget: Optional[float] = Query(None, ge=0, description="Budget constraint"),
@@ -129,8 +194,9 @@ async def create_meal_plan(
     based on the provided parameters.
     """
     service = MealPlanService()
+    resolved_days = resolve_days(days, prompt)
     result = service.create_meal_plan(
-        days=days,
+        days=resolved_days,
         people=people,
         prompt=prompt,
         budget=budget,

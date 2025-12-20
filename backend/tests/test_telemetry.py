@@ -50,17 +50,19 @@ class TestPhoenixTelemetry:
     def test_initialize_phoenix_tracing_success(self):
         """Test successful Phoenix tracing initialization."""
         mock_tracer = MagicMock()
-        
-        with patch.dict(os.environ, {'PHOENIX_API_KEY': 'px-abc123def456'}):
+
+        # Clear env to avoid inheriting developer-specific PHOENIX_COLLECTOR_ENDPOINT values
+        with patch.dict(os.environ, {'PHOENIX_API_KEY': 'px-abc123def456'}, clear=True):
             with patch('phoenix.otel.register', return_value=mock_tracer) as mock_register:
                 result = initialize_phoenix_tracing("test-project")
-                
+
                 assert result == mock_tracer
                 mock_register.assert_called_once_with(
                     project_name="test-project",
+                    endpoint="https://app.phoenix.arize.com/v1/traces",
+                    headers={"api_key": "px-abc123def456"},
                     auto_instrument=True
                 )
-                assert os.environ["PHOENIX_CLIENT_HEADERS"] == "api_key=px-abc123def456"
                 assert os.environ["PHOENIX_COLLECTOR_ENDPOINT"] == "https://app.phoenix.arize.com"
     
     def test_initialize_phoenix_tracing_no_api_key(self):

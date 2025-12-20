@@ -39,18 +39,19 @@ class MealPlanningTasks:
             {preferences_text}
             
             The meal plan should include:
-            1. Breakfast, lunch, and dinner for each day
-            2. Nutritionally balanced meals across the period
-            3. Variety in cuisines and ingredients
-            4. Consideration of preparation time and complexity
-            5. Seasonal ingredient preferences
-            6. Cost optimization within budget constraints
+            1. By default, plan dinners only for each day
+            2. Include breakfast, lunch, and/or snacks ONLY if the user explicitly asks for them
+            3. Nutritionally balanced meals across the period (for the meals requested)
+            4. Variety in cuisines and ingredients
+            5. Consideration of preparation time and complexity
+            6. Seasonal ingredient preferences
+            7. Cost optimization within budget constraints
             
             Pay close attention to the user's preferences and instructions above.
             Ensure meals complement each other and ingredients can be efficiently used
             across multiple recipes to minimize waste.
             """,
-            expected_output="Complete meal plan with recipes assigned to each meal, nutritional summary, and cost estimate",
+            expected_output="Complete meal plan with recipes assigned to each planned meal (dinners by default), nutritional summary, and cost estimate",
             async_execution=False,
             context=[]
         )

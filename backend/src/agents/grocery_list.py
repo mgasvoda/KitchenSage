@@ -36,14 +36,14 @@ class GroceryListAgent:
             llm_config = {}
         else:
             from langchain_openai import ChatOpenAI
-            model = settings.llm.grocery_list_model
-            llm_params = {"model": model}
-            # Reasoning models don't support temperature or stop parameters
-            if is_reasoning_model(model):
-                llm_params["disabled_params"] = {"stop": None}
-            else:
-                llm_params["temperature"] = settings.llm.grocery_list_temperature
-            llm_config = {"llm": ChatOpenAI(**llm_params)}
+            # Prefer the smallest reasonable model for list consolidation/organization.
+            # Can be overridden via env without code changes.
+            model = os.getenv("GROCERY_LIST_MODEL", "gpt-4o-mini")
+            try:
+                temperature = float(os.getenv("GROCERY_LIST_TEMPERATURE", "0.2"))
+            except ValueError:
+                temperature = 0.2
+            llm_config = {"llm": ChatOpenAI(model=model, temperature=temperature)}
         
         self.agent = Agent(
             role="Supply Chain Specialist and Shopping Optimization Expert",
