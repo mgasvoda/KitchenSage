@@ -7,6 +7,8 @@
 import { useEffect, useState } from 'react';
 import { mealPlanApi, groceryListApi } from '../services/api';
 import type { MealPlan, Meal } from '../types';
+import { useToast } from '../contexts/ToastContext';
+import { useTaskPolling } from '../hooks/useTaskPolling';
 
 interface MealPlanDetailModalProps {
   isOpen: boolean;
@@ -22,8 +24,40 @@ export function MealPlanDetailModal({
   const [mealPlan, setMealPlan] = useState<MealPlan | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [generatingGroceryList, setGeneratingGroceryList] = useState(false);
-  const [groceryMessage, setGroceryMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
+  const [currentToastId, setCurrentToastId] = useState<string | null>(null);
+
+  const { showProcessing, updateToast, showError } = useToast();
+
+  // Poll task status when a task is active
+  useTaskPolling({
+    taskId: currentTaskId,
+    onSuccess: (result) => {
+      if (currentToastId) {
+        updateToast(currentToastId, {
+          type: 'success',
+          message: result.message || 'Added ingredients to grocery list!',
+          actionLabel: 'View Grocery List',
+          autoDismiss: true,
+        });
+        setCurrentToastId(null);
+        setCurrentTaskId(null);
+      }
+    },
+    onError: (error) => {
+      if (currentToastId) {
+        updateToast(currentToastId, {
+          type: 'error',
+          message: error || 'Failed to add ingredients',
+          onRetry: handleGenerateGroceryList,
+          autoDismiss: true,
+        });
+        setCurrentToastId(null);
+        setCurrentTaskId(null);
+      }
+    },
+    enabled: !!currentTaskId,
+  });
 
   useEffect(() => {
     if (isOpen && mealPlanId) {
@@ -84,24 +118,28 @@ export function MealPlanDetailModal({
 
   const handleGenerateGroceryList = async () => {
     if (!mealPlan) return;
-    
+
     try {
-      setGeneratingGroceryList(true);
-      setGroceryMessage(null);
+      // Start the async task
       const response = await groceryListApi.addFromMealPlan(mealPlan.id);
-      setGroceryMessage({ type: 'success', text: response.message || 'Added to grocery list!' });
-      // Clear message after 3 seconds
-      setTimeout(() => setGroceryMessage(null), 3000);
+      const taskId = response.task_id;
+
+      // Show processing toast and store the toast ID for updates
+      const toastId = showProcessing('Adding ingredients to grocery list...');
+      setCurrentToastId(toastId);
+      setCurrentTaskId(taskId);
+
+      // Close the modal immediately
+      onClose();
     } catch (err) {
-      setGroceryMessage({ 
-        type: 'error', 
-        text: err instanceof Error ? err.message : 'Failed to generate grocery list' 
-      });
-    } finally {
-      setGeneratingGroceryList(false);
+      showError(
+        err instanceof Error ? err.message : 'Failed to start grocery list task'
+      );
     }
   };
 
+  // Don't render UI if modal is closed
+  // Hooks above still run, keeping the polling active even when hidden
   if (!isOpen) return null;
 
   return (
@@ -258,17 +296,6 @@ export function MealPlanDetailModal({
 
         {/* Footer */}
         <div className="bg-cream-50 px-6 py-4 border-t border-cream-200">
-          {/* Grocery List Feedback */}
-          {groceryMessage && (
-            <div className={`mb-4 p-3 rounded-lg ${
-              groceryMessage.type === 'success' 
-                ? 'bg-green-50 text-green-700 border border-green-200' 
-                : 'bg-red-50 text-red-700 border border-red-200'
-            }`}>
-              {groceryMessage.text}
-            </div>
-          )}
-          
           <div className="flex justify-end gap-3">
             <button
               onClick={onClose}
@@ -279,16 +306,11 @@ export function MealPlanDetailModal({
             {mealPlan && (
               <button
                 onClick={handleGenerateGroceryList}
-                disabled={generatingGroceryList}
-                className="px-4 py-2 bg-sage-600 text-white rounded-lg hover:bg-sage-700 transition-colors font-medium disabled:opacity-50 flex items-center gap-2"
+                className="px-4 py-2 bg-sage-600 text-white rounded-lg hover:bg-sage-700 transition-colors font-medium flex items-center gap-2"
               >
-                {generatingGroceryList ? (
-                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
-                ) : (
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                  </svg>
-                )}
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
                 Add to Grocery List
               </button>
             )}

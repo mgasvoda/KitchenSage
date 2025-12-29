@@ -47,6 +47,10 @@ CREW_VERBOSE=true
 # LLM Token Limits (optional - defaults provided)
 # LLM_CONSOLIDATION_MAX_TOKENS=4000
 
+# Consolidation Optimization (optional - defaults provided)
+# LLM_CONSOLIDATION_BATCH_SIZE=35              # Maximum items per batch for consolidation
+# LLM_CONSOLIDATION_PREGROUP_THRESHOLD=40      # Minimum items to trigger pre-grouping optimization
+
 # Agent Behavior (optional - defaults provided)
 # LLM_AGENT_VERBOSE=true
 

@@ -302,10 +302,19 @@ export const groceryListApi = {
    */
   addFromMealPlan: async (
     mealPlanId: number
-  ): Promise<{ status: string; message: string; grocery_list: GroceryList }> => {
+  ): Promise<{ status: string; task_id: string; message: string }> => {
     return fetchApi(`/grocery-lists/add-from-meal-plan?meal_plan_id=${mealPlanId}`, {
       method: 'POST',
     });
+  },
+
+  /**
+   * Get the status of an async task.
+   */
+  getTaskStatus: async (
+    taskId: string
+  ): Promise<{ status: string; task: any }> => {
+    return fetchApi(`/grocery-lists/tasks/${taskId}`);
   },
 
   updateItem: async (

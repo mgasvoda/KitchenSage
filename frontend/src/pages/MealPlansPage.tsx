@@ -274,14 +274,12 @@ export function MealPlansPage() {
         planConfig={createForm}
       />
 
-      {/* Meal Plan Detail Modal */}
-      {selectedMealPlanId && (
-        <MealPlanDetailModal
-          isOpen={selectedMealPlanId !== null}
-          onClose={() => setSelectedMealPlanId(null)}
-          mealPlanId={selectedMealPlanId}
-        />
-      )}
+      {/* Meal Plan Detail Modal - always rendered to preserve polling state */}
+      <MealPlanDetailModal
+        isOpen={selectedMealPlanId !== null}
+        onClose={() => setSelectedMealPlanId(null)}
+        mealPlanId={selectedMealPlanId ?? 0}
+      />
     </div>
   );
 }

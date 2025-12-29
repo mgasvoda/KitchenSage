@@ -108,6 +108,21 @@ class LLMSettings(BaseSettings):
         description="Enable verbose output from agents"
     )
 
+    # Consolidation optimization
+    consolidation_batch_size: int = Field(
+        default=35,
+        ge=10,
+        le=100,
+        description="Maximum items per batch for consolidation"
+    )
+
+    consolidation_pregroup_threshold: int = Field(
+        default=40,
+        ge=20,
+        le=200,
+        description="Minimum items to trigger pre-grouping optimization"
+    )
+
     class Config:
         env_prefix = "LLM_"
         case_sensitive = False

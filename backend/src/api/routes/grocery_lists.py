@@ -5,7 +5,7 @@ Grocery List API endpoints.
 from typing import Optional, List
 from fastapi import APIRouter, HTTPException, Query
 
-from src.services import GroceryService
+from src.services import GroceryService, get_task_service
 
 router = APIRouter()
 
@@ -135,19 +135,28 @@ async def add_from_meal_plan(
     meal_plan_id: int = Query(..., description="Meal plan ID to add ingredients from"),
 ):
     """
-    Add all ingredients from a meal plan to the grocery list.
+    Add all ingredients from a meal plan to the grocery list (async).
     
-    Gets or creates the default grocery list, then merges all
-    recipe ingredients from the meal plan into it. Quantities
-    are adjusted for servings and combined for duplicate ingredients.
+    This endpoint starts a background task and immediately returns a task_id.
+    Use the /tasks/{task_id} endpoint to check the task status.
+    
+    The background task:
+    - Gets or creates the default grocery list
+    - Consolidates ingredients using LLM
+    - Merges all recipe ingredients from the meal plan
+    - Adjusts quantities for servings and combines duplicates
     """
-    service = GroceryService()
-    result = service.add_meal_plan_ingredients(meal_plan_id=meal_plan_id)
-    
-    if result.get("status") == "error":
-        raise HTTPException(status_code=400, detail=result.get("message", "Failed to add meal plan ingredients"))
-    
-    return result
+    try:
+        service = GroceryService()
+        task_id = service.add_meal_plan_ingredients_async(meal_plan_id=meal_plan_id)
+        
+        return {
+            "status": "success",
+            "task_id": task_id,
+            "message": "Task started. Poll /tasks/{task_id} for status.",
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.delete("/{grocery_list_id}/checked", response_model=dict)
@@ -176,4 +185,24 @@ async def clear_all_items(grocery_list_id: int):
         raise HTTPException(status_code=404, detail=result.get("message", "Grocery list not found"))
     
     return result
+
+
+@router.get("/tasks/{task_id}", response_model=dict)
+async def get_task_status(task_id: str):
+    """
+    Get the status of an asynchronous task.
+    
+    Returns task status, result (if completed), or error (if failed).
+    """
+    task_service = get_task_service()
+    task = task_service.get_task(task_id)
+    
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    
+    return {
+        "status": "success",
+        "task": task,
+    }
+
 

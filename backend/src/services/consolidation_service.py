@@ -1,40 +1,35 @@
 """
-LLM-powered grocery list consolidation service.
+Token-optimized LLM-powered grocery list consolidation service.
 
-Uses direct OpenAI API calls to intelligently consolidate grocery items by:
-- Merging semantically similar items
-- Combining quantities with unit handling
-- Filtering out non-grocery items (water, ice, etc.)
+Uses ultra-compact format and intelligent pre-processing to minimize token usage
+while maintaining high-quality semantic consolidation.
 """
 
 import os
 import json
 import logging
-import re
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
+from collections import defaultdict
 
 from openai import OpenAI
 from src.config import settings
 
 logger = logging.getLogger(__name__)
 
-CONSOLIDATION_SYSTEM_PROMPT = """You are a grocery list optimizer. Given ingredients, output ONLY a JSON object with an "items" array.
-
-Rules:
-1. MERGE similar items (e.g., "chicken breast" + "boneless chicken" = "chicken breast")
-2. SUM quantities for merged items
-3. REMOVE: water, ice, items with no quantity
-4. KEEP the ingredient_id from the larger quantity item when merging
-
-Output format: {"items": [{"name": "...", "quantity": 1.0, "unit": "...", "ingredient_id": 123}, ...]}"""
+# Ultra-minimal system prompt
+CONSOLIDATION_SYSTEM_PROMPT = """Merge similar groceries, sum quantities, remove water/ice. Output JSON array: [["name",qty,"unit"], ...]"""
 
 
 class GroceryConsolidationService:
     """
-    Service for consolidating grocery list items using LLM.
+    Service for consolidating grocery list items using LLM with optimized token usage.
 
-    Provides intelligent deduplication and consolidation of grocery items
-    that goes beyond simple exact-match grouping.
+    Key optimizations:
+    - Ultra-compact array format instead of objects
+    - Pre-grouping for exact matches
+    - Batch processing for large lists
+    - Minimal system prompt
+    - No ingredient_id in LLM (reconnected after)
     """
 
     def __init__(self):
@@ -49,72 +44,126 @@ class GroceryConsolidationService:
                 self._client = OpenAI(api_key=api_key)
         return self._client
 
-    def _extract_json(self, text: str) -> Optional[dict]:
-        """Extract JSON from text that might have markdown or extra content."""
-        if not text:
-            return None
-
-        # Try direct parse first
-        try:
-            return json.loads(text)
-        except json.JSONDecodeError:
-            pass
-
-        # Try to extract from markdown code block
-        code_block_match = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', text)
-        if code_block_match:
-            try:
-                return json.loads(code_block_match.group(1))
-            except json.JSONDecodeError:
-                pass
-
-        # Try to find JSON object in text
-        json_match = re.search(r'\{[\s\S]*\}', text)
-        if json_match:
-            try:
-                return json.loads(json_match.group(0))
-            except json.JSONDecodeError:
-                pass
-
-        return None
-
-    def consolidate_ingredients(
+    def _pregroup_exact_matches(
         self,
         raw_items: List[Dict[str, Any]]
-    ) -> List[Dict[str, Any]]:
+    ) -> Tuple[List[Dict[str, Any]], Dict[str, List[int]]]:
         """
-        Consolidate a list of raw grocery items using LLM.
+        Pre-group items with exact name + unit matches to reduce LLM workload.
 
         Args:
-            raw_items: List of dicts with keys: name, quantity, unit, ingredient_id
+            raw_items: List of raw grocery items
 
         Returns:
-            Consolidated list with merged quantities and filtered non-groceries.
-            Falls back to original items on any error.
+            Tuple of (grouped_items, name_to_original_indices)
         """
-        if not raw_items:
+        # Group by (name_lower, unit) key
+        groups = defaultdict(list)
+
+        for idx, item in enumerate(raw_items):
+            name = item.get('name', '').lower().strip()
+            unit = item.get('unit', 'piece').lower().strip()
+            key = (name, unit)
+            groups[key].append((idx, item))
+
+        # Create grouped items with summed quantities
+        grouped_items = []
+        name_to_indices = {}
+
+        for (name, unit), items in groups.items():
+            if not name:
+                continue
+
+            # Sum quantities for exact matches
+            total_quantity = sum(item.get('quantity', 0) for _, item in items)
+
+            # Use the first item's original name (preserve case)
+            original_name = items[0][1].get('name', name)
+
+            grouped_item = {
+                'name': original_name,
+                'quantity': round(total_quantity, 2),
+                'unit': unit
+            }
+            grouped_items.append(grouped_item)
+
+            # Track which original indices contributed to this grouped item
+            name_key = f"{original_name}|{unit}"
+            name_to_indices[name_key] = [idx for idx, _ in items]
+
+        logger.info(f"Pre-grouping reduced {len(raw_items)} items to {len(grouped_items)} items")
+        return grouped_items, name_to_indices
+
+    def _to_compact_format(self, items: List[Dict[str, Any]]) -> List[List]:
+        """
+        Convert items to ultra-compact array format for minimal tokens.
+
+        Args:
+            items: List of item dicts with name, quantity, unit
+
+        Returns:
+            List of [name, quantity, unit] arrays
+        """
+        compact = []
+        for item in items:
+            name = item.get('name', '')
+            quantity = item.get('quantity', 0)
+            unit = item.get('unit', 'piece')
+
+            if name:  # Skip empty names
+                compact.append([name, round(quantity, 2), unit])
+
+        return compact
+
+    def _from_compact_format(self, compact_items: List[List]) -> List[Dict[str, Any]]:
+        """
+        Convert compact array format back to dictionary format.
+
+        Args:
+            compact_items: List of [name, quantity, unit] arrays
+
+        Returns:
+            List of item dictionaries
+        """
+        items = []
+        for compact in compact_items:
+            if len(compact) >= 3:
+                items.append({
+                    'name': compact[0],
+                    'quantity': float(compact[1]),
+                    'unit': compact[2]
+                })
+        return items
+
+    def _consolidate_batch(
+        self,
+        items: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """
+        Consolidate a single batch of items using LLM.
+
+        Args:
+            items: List of items to consolidate (should be pre-grouped)
+
+        Returns:
+            Consolidated list of items
+        """
+        if not items:
             return []
 
         client = self._get_client()
         if not client:
             logger.warning("OpenAI API key not available, skipping LLM consolidation")
-            return raw_items
+            return items
 
         try:
-            logger.info(f"Starting LLM consolidation for {len(raw_items)} items")
-            # Prepare items for LLM - compact format to save tokens
-            items_for_llm = [
-                {
-                    'name': item.get('name', ''),
-                    'quantity': round(item.get('quantity', 0), 2),
-                    'unit': item.get('unit', 'piece'),
-                    'ingredient_id': item.get('ingredient_id')
-                }
-                for item in raw_items
-            ]
+            # Convert to ultra-compact format
+            compact_items = self._to_compact_format(items)
 
-            # Use compact JSON to reduce input tokens
-            items_json = json.dumps(items_for_llm, separators=(',', ':'))
+            # Use compact JSON (no spaces)
+            items_json = json.dumps(compact_items, separators=(',', ':'))
+
+            logger.debug(f"Sending {len(compact_items)} items to LLM ({len(items_json)} chars)")
 
             response = client.chat.completions.create(
                 model=self.model,
@@ -123,46 +172,123 @@ class GroceryConsolidationService:
                     {"role": "user", "content": items_json}
                 ],
                 temperature=settings.llm.consolidation_temperature,
-                max_tokens=settings.llm.consolidation_max_tokens,
+                max_completion_tokens=settings.llm.consolidation_max_tokens,
                 response_format={"type": "json_object"}
             )
 
             result_text = response.choices[0].message.content
-            result = self._extract_json(result_text)
 
-            if result is None:
-                logger.error(f"Could not extract JSON from LLM response (length={len(result_text or '')})")
-                return raw_items
+            # Parse response
+            result = json.loads(result_text)
 
-            # Handle both {"items": [...]} and direct array formats
+            # Handle both direct array and {"items": [...]} formats
             if isinstance(result, dict):
-                items = result.get("items", [])
+                compact_result = result.get("items", result.get("data", []))
             elif isinstance(result, list):
-                items = result
+                compact_result = result
             else:
                 logger.warning(f"Unexpected LLM response format: {type(result)}")
-                return raw_items
+                return items
 
-            # Validate each item has required fields
-            validated_items = []
-            for item in items:
-                if 'name' in item and 'quantity' in item:
-                    validated_item = {
-                        'name': item['name'],
-                        'quantity': float(item['quantity']),
-                        'unit': item.get('unit', 'piece'),
-                    }
-                    # Only include ingredient_id if present
-                    if item.get('ingredient_id') is not None:
-                        validated_item['ingredient_id'] = item['ingredient_id']
-                    validated_items.append(validated_item)
+            # Convert back from compact format
+            consolidated = self._from_compact_format(compact_result)
 
-            logger.info(f"Consolidated {len(raw_items)} items into {len(validated_items)} items")
-            return validated_items
+            logger.info(f"LLM consolidated {len(items)} items to {len(consolidated)} items")
+            return consolidated
 
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse LLM consolidation response: {e}")
-            return raw_items
+            return items
         except Exception as e:
             logger.error(f"LLM consolidation failed: {e}")
-            return raw_items  # Graceful degradation
+            return items
+
+    def consolidate_ingredients(
+        self,
+        raw_items: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """
+        Consolidate a list of raw grocery items using optimized LLM processing.
+
+        This is the main entry point. Handles:
+        - Pre-grouping for exact matches (if list is large enough)
+        - Batch processing for very large lists
+        - Ultra-compact format for token efficiency
+
+        NOTE: ingredient_id is NOT preserved during consolidation.
+        Caller must reconnect IDs after using ingredient name lookup.
+
+        Args:
+            raw_items: List of dicts with keys: name, quantity, unit
+                      (ingredient_id is ignored)
+
+        Returns:
+            Consolidated list with name, quantity, unit only.
+            Falls back to original items on any error.
+        """
+        if not raw_items:
+            return []
+
+        client = self._get_client()
+        if not client:
+            logger.warning("OpenAI API key not available, skipping LLM consolidation")
+            # Return items without ingredient_id (consistent with success path)
+            return [
+                {
+                    'name': item.get('name', ''),
+                    'quantity': item.get('quantity', 0),
+                    'unit': item.get('unit', 'piece')
+                }
+                for item in raw_items
+            ]
+
+        try:
+            logger.info(f"Starting LLM consolidation for {len(raw_items)} items")
+
+            # Pre-group exact matches if list is large enough
+            if len(raw_items) >= settings.llm.consolidation_pregroup_threshold:
+                items_to_consolidate, _ = self._pregroup_exact_matches(raw_items)
+            else:
+                # Just strip ingredient_id
+                items_to_consolidate = [
+                    {
+                        'name': item.get('name', ''),
+                        'quantity': item.get('quantity', 0),
+                        'unit': item.get('unit', 'piece')
+                    }
+                    for item in raw_items
+                ]
+
+            # Batch processing for very large lists
+            batch_size = settings.llm.consolidation_batch_size
+
+            if len(items_to_consolidate) <= batch_size:
+                # Single batch
+                consolidated = self._consolidate_batch(items_to_consolidate)
+            else:
+                # Multiple batches
+                logger.info(f"Processing {len(items_to_consolidate)} items in batches of {batch_size}")
+                all_consolidated = []
+
+                for i in range(0, len(items_to_consolidate), batch_size):
+                    batch = items_to_consolidate[i:i + batch_size]
+                    batch_result = self._consolidate_batch(batch)
+                    all_consolidated.extend(batch_result)
+
+                # Final pass to merge across batches (exact matches only, no LLM)
+                consolidated, _ = self._pregroup_exact_matches(all_consolidated)
+
+            logger.info(f"Final result: {len(raw_items)} items → {len(consolidated)} items")
+            return consolidated
+
+        except Exception as e:
+            logger.error(f"Consolidation pipeline failed: {e}")
+            # Return items without ingredient_id
+            return [
+                {
+                    'name': item.get('name', ''),
+                    'quantity': item.get('quantity', 0),
+                    'unit': item.get('unit', 'piece')
+                }
+                for item in raw_items
+            ]
