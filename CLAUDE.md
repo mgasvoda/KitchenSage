@@ -180,6 +180,64 @@ className="bg-sage-600 text-cream-100"
 1. Copy `env_example.txt` to `.env` in project root
 2. Configure OpenAI API key
 3. Optionally configure Phoenix tracing
+4. Optionally tune LLM and application settings (see Configuration below)
+
+## Configuration
+
+### Settings Architecture
+
+KitchenSage uses a centralized configuration system located in `backend/src/config/settings.py`. Settings are managed using Pydantic and can be overridden via environment variables.
+
+### Configurable Settings
+
+#### LLM Models
+Control which OpenAI models are used for different agents:
+- `LLM_DEFAULT_MODEL` - Default model for general tasks (default: `gpt-4o-mini`)
+- `LLM_CONSOLIDATION_MODEL` - Model for grocery list consolidation (default: `gpt-4o-mini`)
+- `LLM_ORCHESTRATOR_MODEL` - Model for orchestrator agent (default: `gpt-4.1-mini`)
+- `LLM_MEAL_PLANNER_MODEL` - Model for meal planning (default: `gpt-4.1-mini`)
+- `LLM_RECIPE_SCOUT_MODEL` - Model for recipe discovery (default: `gpt-4.1-mini`)
+- `LLM_RECIPE_MANAGER_MODEL` - Model for recipe management (default: `gpt-4.1-mini`)
+- `LLM_GROCERY_LIST_MODEL` - Model for grocery list agent (default: `gpt-4.1-mini`)
+
+#### LLM Behavior
+Control LLM temperature and token usage:
+- `LLM_ORCHESTRATOR_TEMPERATURE` - Temperature for orchestrator (default: `0.1`)
+- `LLM_MEAL_PLANNER_TEMPERATURE` - Temperature for meal planner (default: `0.3`)
+- `LLM_RECIPE_SCOUT_TEMPERATURE` - Temperature for recipe scout (default: `0.4`)
+- `LLM_RECIPE_MANAGER_TEMPERATURE` - Temperature for recipe manager (default: `0.1`)
+- `LLM_GROCERY_LIST_TEMPERATURE` - Temperature for grocery list (default: `0.2`)
+- `LLM_CONSOLIDATION_TEMPERATURE` - Temperature for consolidation (default: `0.1`)
+- `LLM_CONSOLIDATION_MAX_TOKENS` - Max tokens for consolidation (default: `4000`)
+- `LLM_AGENT_VERBOSE` - Enable verbose agent output (default: `true`)
+
+#### Meal Planning Defaults
+Default values for meal plan generation:
+- `MEAL_DEFAULT_DAYS` - Default number of days (default: `7`)
+- `MEAL_DEFAULT_PEOPLE` - Default number of people (default: `2`)
+- `MEAL_DEFAULT_SERVINGS` - Default servings when not specified (default: `4`)
+- `MEAL_MEALS_PER_DAY` - Number of meals per day (default: `3`)
+
+#### Recipe Discovery
+Settings for recipe search and discovery:
+- `RECIPE_DEFAULT_MAX_RESULTS` - Max recipes to discover (default: `5`)
+- `RECIPE_DEFAULT_SERVINGS_FALLBACK` - Fallback when scraping fails (default: `4`)
+
+### Accessing Settings in Code
+
+```python
+from src.config import settings
+
+# Access LLM settings
+model = settings.llm.orchestrator_model
+temp = settings.llm.orchestrator_temperature
+
+# Access meal planning defaults
+days = settings.meal_planning.default_days
+people = settings.meal_planning.default_people
+```
+
+All settings have sensible defaults and are optional - the application works out of the box without any environment variable configuration beyond the required OpenAI API key.
 
 ## Testing Strategy
 

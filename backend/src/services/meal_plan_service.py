@@ -8,6 +8,7 @@ from typing import Optional, List, Dict, Any, AsyncGenerator
 
 from src.database import MealPlanRepository, DatabaseError, RecordNotFoundError
 from src.crew import KitchenCrew
+from src.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -129,24 +130,28 @@ class MealPlanService:
     
     def create_meal_plan(
         self,
-        days: int = 7,
-        people: int = 2,
+        days: int = None,
+        people: int = None,
         prompt: Optional[str] = None,
         budget: Optional[float] = None,
     ) -> Dict[str, Any]:
         """
         Create a new meal plan using AI agents.
-        
+
         Args:
-            days: Number of days for the meal plan
-            people: Number of people to plan for
+            days: Number of days for the meal plan (defaults to settings)
+            people: Number of people to plan for (defaults to settings)
             prompt: Free-form preferences and instructions
             budget: Optional budget constraint
-            
+
         Returns:
             Dictionary with created meal plan or error
         """
         try:
+            # Use defaults from settings if not provided
+            days = days if days is not None else settings.meal_planning.default_days
+            people = people if people is not None else settings.meal_planning.default_people
+
             result = self.kitchen_crew.create_meal_plan(
                 days=days,
                 people=people,
@@ -175,29 +180,33 @@ class MealPlanService:
     
     async def create_meal_plan_stream(
         self,
-        days: int = 7,
-        people: int = 2,
+        days: int = None,
+        people: int = None,
         prompt: Optional[str] = None,
         budget: Optional[float] = None,
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """
         Create a meal plan with streaming agent activity updates.
-        
+
         Args:
-            days: Number of days for the meal plan
-            people: Number of people to plan for
+            days: Number of days for the meal plan (defaults to settings)
+            people: Number of people to plan for (defaults to settings)
             prompt: Free-form preferences and instructions
             budget: Optional budget constraint
-            
+
         Yields:
             Agent activity events during meal plan creation
         """
         import queue
         import threading
-        
+
+        # Use defaults from settings if not provided
+        days = days if days is not None else settings.meal_planning.default_days
+        people = people if people is not None else settings.meal_planning.default_people
+
         # Queue for events from callback thread
         event_queue: queue.Queue = queue.Queue()
-        
+
         # Cancellation flag - thread checks this to stop early
         cancel_event = threading.Event()
         

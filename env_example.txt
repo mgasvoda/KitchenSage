@@ -2,7 +2,11 @@
 OPENAI_API_KEY=your_openai_api_key_here
 
 # Phoenix Telemetry Configuration
+# Get your API key and collector endpoint from Phoenix Settings: https://app.phoenix.arize.com
 PHOENIX_API_KEY=your_phoenix_api_key_here
+# Optional: Space-specific collector endpoint (e.g., https://app.phoenix.arize.com/s/your-space-name)
+# If not set, defaults to https://app.phoenix.arize.com
+PHOENIX_COLLECTOR_ENDPOINT=
 
 # Database Configuration
 DATABASE_URL=sqlite:///kitchen_crew.db
@@ -21,4 +25,37 @@ PORT=8000
 
 # CrewAI Configuration
 CREW_MAX_EXECUTION_TIME=300
-CREW_VERBOSE=true 
+CREW_VERBOSE=true
+
+# LLM Model Configuration (optional - defaults provided)
+# LLM_DEFAULT_MODEL=gpt-4o-mini
+# LLM_CONSOLIDATION_MODEL=gpt-4o-mini
+# LLM_ORCHESTRATOR_MODEL=gpt-4.1-mini
+# LLM_MEAL_PLANNER_MODEL=gpt-4.1-mini
+# LLM_RECIPE_SCOUT_MODEL=gpt-4.1-mini
+# LLM_RECIPE_MANAGER_MODEL=gpt-4.1-mini
+# LLM_GROCERY_LIST_MODEL=gpt-4.1-mini
+
+# LLM Temperature Settings (optional - defaults provided, range 0.0-2.0)
+# LLM_ORCHESTRATOR_TEMPERATURE=0.1
+# LLM_MEAL_PLANNER_TEMPERATURE=0.3
+# LLM_RECIPE_SCOUT_TEMPERATURE=0.4
+# LLM_RECIPE_MANAGER_TEMPERATURE=0.1
+# LLM_GROCERY_LIST_TEMPERATURE=0.2
+# LLM_CONSOLIDATION_TEMPERATURE=0.1
+
+# LLM Token Limits (optional - defaults provided)
+# LLM_CONSOLIDATION_MAX_TOKENS=4000
+
+# Agent Behavior (optional - defaults provided)
+# LLM_AGENT_VERBOSE=true
+
+# Meal Planning Defaults (optional - defaults provided)
+# MEAL_DEFAULT_DAYS=7
+# MEAL_DEFAULT_PEOPLE=2
+# MEAL_DEFAULT_SERVINGS=4
+# MEAL_MEALS_PER_DAY=3
+
+# Recipe Discovery Defaults (optional - defaults provided)
+# RECIPE_DEFAULT_MAX_RESULTS=5
+# RECIPE_DEFAULT_SERVINGS_FALLBACK=4 

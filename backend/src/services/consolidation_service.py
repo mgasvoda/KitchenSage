@@ -14,6 +14,7 @@ import re
 from typing import List, Dict, Any, Optional
 
 from openai import OpenAI
+from src.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +39,7 @@ class GroceryConsolidationService:
 
     def __init__(self):
         self._client: Optional[OpenAI] = None
-        self.model = "gpt-4o-mini"
+        self.model = settings.llm.consolidation_model
 
     def _get_client(self) -> Optional[OpenAI]:
         """Lazy initialization of OpenAI client."""
@@ -100,6 +101,7 @@ class GroceryConsolidationService:
             return raw_items
 
         try:
+            logger.info(f"Starting LLM consolidation for {len(raw_items)} items")
             # Prepare items for LLM - compact format to save tokens
             items_for_llm = [
                 {
@@ -120,8 +122,8 @@ class GroceryConsolidationService:
                     {"role": "system", "content": CONSOLIDATION_SYSTEM_PROMPT},
                     {"role": "user", "content": items_json}
                 ],
-                temperature=0.1,
-                max_tokens=4000,  # Increased for large meal plans
+                temperature=settings.llm.consolidation_temperature,
+                max_tokens=settings.llm.consolidation_max_tokens,
                 response_format={"type": "json_object"}
             )
 

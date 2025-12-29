@@ -8,6 +8,9 @@ of CrewAI agents and LLM interactions.
 import os
 import logging
 from typing import Optional
+from dotenv import load_dotenv
+
+load_dotenv()
 
 logger = logging.getLogger(__name__)
 
@@ -34,21 +37,27 @@ def initialize_phoenix_tracing(project_name: str = "kitchencrew") -> Optional[ob
             logger.warning("PHOENIX_API_KEY appears to be a placeholder. Skipping Phoenix tracing initialization.")
             return None
         
-        # Set Phoenix environment variables
-        os.environ["PHOENIX_CLIENT_HEADERS"] = f"api_key={phoenix_api_key}"
-        os.environ["PHOENIX_COLLECTOR_ENDPOINT"] = "https://app.phoenix.arize.com"
-        
+        # Use custom collector endpoint if provided, otherwise use default
+        collector_endpoint = os.getenv('PHOENIX_COLLECTOR_ENDPOINT')
+        if not collector_endpoint:
+            collector_endpoint = "https://app.phoenix.arize.com"
+
         # Import and register Phoenix tracing
         from phoenix.otel import register
-        
+
         # Configure the Phoenix tracer with auto-instrumentation
+        # Pass endpoint and headers directly to register() instead of env vars
         tracer_provider = register(
             project_name=project_name,
-            auto_instrument=True  # Auto-instrument based on installed OI dependencies
+            endpoint=collector_endpoint,
+            headers={"Authorization": f"Bearer {phoenix_api_key}"},
+            protocol="http/protobuf",  # Explicit protocol for HTTPS endpoints
+            auto_instrument=True,  # Auto-instrument based on installed OI dependencies
+            batch=True  # Use batch processing for production
         )
         
         logger.info(f"Phoenix tracing initialized successfully for project: {project_name}")
-        logger.info("Tracing endpoint: https://app.phoenix.arize.com")
+        logger.info(f"Tracing endpoint: {collector_endpoint}")
         
         return tracer_provider
         

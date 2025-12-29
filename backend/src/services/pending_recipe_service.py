@@ -11,6 +11,7 @@ from src.models import (
     PendingRecipeStatus, PendingRecipeIngredient
 )
 from src.tools.web_tools import WebScrapingTool, WebSearchTool
+from src.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -95,30 +96,33 @@ class PendingRecipeService:
         query: str,
         cuisine: Optional[str] = None,
         dietary_restrictions: Optional[List[str]] = None,
-        max_results: int = 5
+        max_results: int = None
     ) -> Dict[str, Any]:
         """
         Discover recipes using AI search and save them as pending.
-        
+
         Args:
             query: Natural language search query
             cuisine: Optional cuisine filter
             dietary_restrictions: Optional dietary restrictions
-            max_results: Maximum number of recipes to discover
-            
+            max_results: Maximum number of recipes to discover (defaults to settings)
+
         Returns:
             Dictionary with status and list of pending recipes
         """
         try:
             logger.info(f"Discovering recipes with query: {query}")
-            
+
+            # Use default from settings if not provided
+            max_results = max_results if max_results is not None else settings.recipe_discovery.default_max_results
+
             # Build enhanced search query
             search_query = query
             if cuisine:
                 search_query = f"{cuisine} {search_query}"
             if dietary_restrictions:
                 search_query = f"{' '.join(dietary_restrictions)} {search_query}"
-            
+
             # Use the web search tool
             search_results = self.search_tool._run(search_query, max_results=max_results)
             

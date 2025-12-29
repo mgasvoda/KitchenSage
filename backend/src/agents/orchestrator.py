@@ -6,6 +6,7 @@ import os
 from crewai import Agent
 from typing import List, Optional, Dict, Any
 from src.tools.web_tools import WebSearchTool
+from src.config import settings
 
 
 class OrchestratorAgent:
@@ -34,7 +35,10 @@ class OrchestratorAgent:
             llm_config = {}
         else:
             from langchain_openai import ChatOpenAI
-            llm_config = {"llm": ChatOpenAI(model="gpt-4.1-mini", temperature=0.1)}
+            llm_config = {"llm": ChatOpenAI(
+                model=settings.llm.orchestrator_model,
+                temperature=settings.llm.orchestrator_temperature
+            )}
         
         self.agent = Agent(
             role="KitchenCrew Query Orchestrator",
@@ -56,7 +60,7 @@ class OrchestratorAgent:
             cooking agents, ensuring every request is properly understood and routed to 
             the right experts.""",
             tools=self.tools,
-            verbose=True,
+            verbose=settings.llm.agent_verbose,
             allow_delegation=True,  # This agent can delegate to other agents
             **llm_config
         ) 
