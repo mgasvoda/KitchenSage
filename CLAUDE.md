@@ -194,11 +194,11 @@ KitchenSage uses a centralized configuration system located in `backend/src/conf
 Control which OpenAI models are used for different agents:
 - `LLM_DEFAULT_MODEL` - Default model for general tasks (default: `gpt-4o-mini`)
 - `LLM_CONSOLIDATION_MODEL` - Model for grocery list consolidation (default: `gpt-4o-mini`)
-- `LLM_ORCHESTRATOR_MODEL` - Model for orchestrator agent (default: `gpt-4.1-mini`)
-- `LLM_MEAL_PLANNER_MODEL` - Model for meal planning (default: `gpt-4.1-mini`)
-- `LLM_RECIPE_SCOUT_MODEL` - Model for recipe discovery (default: `gpt-4.1-mini`)
-- `LLM_RECIPE_MANAGER_MODEL` - Model for recipe management (default: `gpt-4.1-mini`)
-- `LLM_GROCERY_LIST_MODEL` - Model for grocery list agent (default: `gpt-4.1-mini`)
+- `LLM_ORCHESTRATOR_MODEL` - Model for orchestrator agent (default: `gpt-5-mini`)
+- `LLM_MEAL_PLANNER_MODEL` - Model for meal planning (default: `gpt-5-mini`)
+- `LLM_RECIPE_SCOUT_MODEL` - Model for recipe discovery (default: `gpt-5-mini`)
+- `LLM_RECIPE_MANAGER_MODEL` - Model for recipe management (default: `gpt-5-mini`)
+- `LLM_GROCERY_LIST_MODEL` - Model for grocery list agent (default: `gpt-5-mini`)
 
 #### LLM Behavior
 Control LLM temperature and token usage:

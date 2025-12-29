@@ -21,33 +21,33 @@ class LLMSettings(BaseSettings):
     )
 
     consolidation_model: str = Field(
-        default="gpt-4o-mini",
+        default="gpt-5-nano",
         description="LLM model for grocery list consolidation"
     )
 
     # Agent-specific models
     orchestrator_model: str = Field(
-        default="gpt-4.1-mini",
+        default="gpt-5-mini",
         description="Model for orchestrator agent"
     )
 
     meal_planner_model: str = Field(
-        default="gpt-4.1-mini",
+        default="gpt-5-mini",
         description="Model for meal planning agent"
     )
 
     recipe_scout_model: str = Field(
-        default="gpt-4.1-mini",
+        default="gpt-5-mini",
         description="Model for recipe discovery agent"
     )
 
     recipe_manager_model: str = Field(
-        default="gpt-4.1-mini",
+        default="gpt-5-mini",
         description="Model for recipe management agent"
     )
 
     grocery_list_model: str = Field(
-        default="gpt-4.1-mini",
+        default="gpt-5-mini",
         description="Model for grocery list agent"
     )
 
@@ -117,7 +117,7 @@ class MealPlanningSettings(BaseSettings):
     """Meal planning defaults and configuration."""
 
     default_days: int = Field(
-        default=7,
+        default=4,
         ge=1,
         le=30,
         description="Default number of days for meal plans"
@@ -131,7 +131,7 @@ class MealPlanningSettings(BaseSettings):
     )
 
     default_servings: int = Field(
-        default=4,
+        default=2,
         ge=1,
         le=50,
         description="Default servings when recipe doesn't specify"

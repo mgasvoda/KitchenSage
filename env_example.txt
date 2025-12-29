@@ -30,11 +30,11 @@ CREW_VERBOSE=true
 # LLM Model Configuration (optional - defaults provided)
 # LLM_DEFAULT_MODEL=gpt-4o-mini
 # LLM_CONSOLIDATION_MODEL=gpt-4o-mini
-# LLM_ORCHESTRATOR_MODEL=gpt-4.1-mini
-# LLM_MEAL_PLANNER_MODEL=gpt-4.1-mini
-# LLM_RECIPE_SCOUT_MODEL=gpt-4.1-mini
-# LLM_RECIPE_MANAGER_MODEL=gpt-4.1-mini
-# LLM_GROCERY_LIST_MODEL=gpt-4.1-mini
+# LLM_ORCHESTRATOR_MODEL=gpt-5-mini
+# LLM_MEAL_PLANNER_MODEL=gpt-5-mini
+# LLM_RECIPE_SCOUT_MODEL=gpt-5-mini
+# LLM_RECIPE_MANAGER_MODEL=gpt-5-mini
+# LLM_GROCERY_LIST_MODEL=gpt-5-mini
 
 # LLM Temperature Settings (optional - defaults provided, range 0.0-2.0)
 # LLM_ORCHESTRATOR_TEMPERATURE=0.1
