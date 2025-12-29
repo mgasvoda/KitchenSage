@@ -6,7 +6,7 @@ import os
 from crewai import Agent
 from src.tools.grocery_tools import InventoryTool, PriceComparisonTool, ListOptimizationTool
 from src.tools.database_tools import DatabaseTool
-from src.config import settings
+from src.config import settings, is_reasoning_model
 
 
 class GroceryListAgent:
@@ -36,10 +36,14 @@ class GroceryListAgent:
             llm_config = {}
         else:
             from langchain_openai import ChatOpenAI
-            llm_config = {"llm": ChatOpenAI(
-                model=settings.llm.grocery_list_model,
-                temperature=settings.llm.grocery_list_temperature
-            )}
+            model = settings.llm.grocery_list_model
+            llm_params = {"model": model}
+            # Reasoning models don't support temperature or stop parameters
+            if is_reasoning_model(model):
+                llm_params["disabled_params"] = {"stop": None}
+            else:
+                llm_params["temperature"] = settings.llm.grocery_list_temperature
+            llm_config = {"llm": ChatOpenAI(**llm_params)}
         
         self.agent = Agent(
             role="Supply Chain Specialist and Shopping Optimization Expert",

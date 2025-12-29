@@ -5,7 +5,7 @@ Recipe Scout Agent - Discovers and retrieves recipes from external sources.
 import os
 from crewai import Agent
 from src.tools.web_tools import WebSearchTool, WebScrapingTool, RecipeAPITool, ContentFilterTool
-from src.config import settings
+from src.config import settings, is_reasoning_model
 
 
 class RecipeScoutAgent:
@@ -35,10 +35,14 @@ class RecipeScoutAgent:
             llm_config = {}
         else:
             from langchain_openai import ChatOpenAI
-            llm_config = {"llm": ChatOpenAI(
-                model=settings.llm.recipe_scout_model,
-                temperature=settings.llm.recipe_scout_temperature
-            )}
+            model = settings.llm.recipe_scout_model
+            llm_params = {"model": model}
+            # Reasoning models don't support temperature or stop parameters
+            if is_reasoning_model(model):
+                llm_params["disabled_params"] = {"stop": None}
+            else:
+                llm_params["temperature"] = settings.llm.recipe_scout_temperature
+            llm_config = {"llm": ChatOpenAI(**llm_params)}
         
         self.agent = Agent(
             role="Culinary Researcher and Recipe Discovery Specialist",

@@ -6,7 +6,7 @@ import os
 from crewai import Agent
 from src.tools.meal_planning_tools import MealPlanningTool, NutritionAnalysisTool, CalendarTool
 from src.tools.database_tools import RecipeSearchTool
-from src.config import settings
+from src.config import settings, is_reasoning_model
 
 
 class MealPlannerAgent:
@@ -36,10 +36,14 @@ class MealPlannerAgent:
             llm_config = {}
         else:
             from langchain_openai import ChatOpenAI
-            llm_config = {"llm": ChatOpenAI(
-                model=settings.llm.meal_planner_model,
-                temperature=settings.llm.meal_planner_temperature
-            )}
+            model = settings.llm.meal_planner_model
+            llm_params = {"model": model}
+            # Reasoning models don't support temperature or stop parameters
+            if is_reasoning_model(model):
+                llm_params["disabled_params"] = {"stop": None}
+            else:
+                llm_params["temperature"] = settings.llm.meal_planner_temperature
+            llm_config = {"llm": ChatOpenAI(**llm_params)}
         
         self.agent = Agent(
             role="Certified Nutritionist and Meal Planning Expert",

@@ -12,7 +12,7 @@ from typing import List, Dict, Any, Optional, Tuple
 from collections import defaultdict
 
 from openai import OpenAI
-from src.config import settings
+from src.config import settings, is_reasoning_model
 
 logger = logging.getLogger(__name__)
 
@@ -165,16 +165,22 @@ class GroceryConsolidationService:
 
             logger.debug(f"Sending {len(compact_items)} items to LLM ({len(items_json)} chars)")
 
-            response = client.chat.completions.create(
-                model=self.model,
-                messages=[
+            # Build API params - reasoning models don't support temperature
+            api_params = {
+                "model": self.model,
+                "messages": [
                     {"role": "system", "content": CONSOLIDATION_SYSTEM_PROMPT},
                     {"role": "user", "content": items_json}
                 ],
-                temperature=settings.llm.consolidation_temperature,
-                max_completion_tokens=settings.llm.consolidation_max_tokens,
-                response_format={"type": "json_object"}
-            )
+                "max_completion_tokens": settings.llm.consolidation_max_tokens,
+                "response_format": {"type": "json_object"}
+            }
+
+            # Only include temperature for non-reasoning models
+            if not is_reasoning_model(self.model):
+                api_params["temperature"] = settings.llm.consolidation_temperature
+
+            response = client.chat.completions.create(**api_params)
 
             result_text = response.choices[0].message.content
 

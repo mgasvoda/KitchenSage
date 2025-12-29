@@ -6,9 +6,36 @@ and other configurable options.
 """
 
 import os
+import re
 from typing import Optional
 from pydantic_settings import BaseSettings
 from pydantic import Field
+
+
+# Models that don't support temperature, top_p, stop parameters
+# These are OpenAI reasoning models that only support temperature=1
+REASONING_MODEL_PATTERNS = [
+    r'^o1',           # o1, o1-mini, o1-preview
+    r'^o3',           # o3, o3-mini, o3-pro
+    r'^o4',           # o4-mini
+    r'^gpt-5',        # gpt-5, gpt-5-mini, gpt-5-nano
+]
+
+
+def is_reasoning_model(model_name: str) -> bool:
+    """
+    Check if a model is a reasoning model that doesn't support temperature/stop params.
+
+    Args:
+        model_name: The model name to check
+
+    Returns:
+        True if the model is a reasoning model, False otherwise
+    """
+    if not model_name:
+        return False
+    model_lower = model_name.lower()
+    return any(re.match(pattern, model_lower) for pattern in REASONING_MODEL_PATTERNS)
 
 
 class LLMSettings(BaseSettings):
