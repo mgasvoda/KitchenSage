@@ -13,10 +13,16 @@ from src.database import (
 from src.models import (
     Recipe, RecipeCreate, RecipeUpdate, Ingredient, IngredientCreate,
     MealPlan, MealPlanCreate, GroceryList, GroceryListCreate,
-    DifficultyLevel, CuisineType, DietaryTag, IngredientCategory, MeasurementUnit
+    DifficultyLevel, CuisineType, DietaryTag, MealType, IngredientCategory, MeasurementUnit
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _get_recipe_search_service():
+    """Lazy import to avoid circular dependency."""
+    from src.services.recipe_search_service import RecipeSearchService
+    return RecipeSearchService()
 
 
 class DatabaseTool(BaseTool):
@@ -331,87 +337,96 @@ class RecipeValidatorTool(BaseTool):
 
 
 class RecipeSearchTool(BaseTool):
-    """Tool for searching recipes in the database."""
+    """
+    Tool for searching recipes in the database.
+    
+    Supports both structured field searches and semantic/natural language queries.
+    This tool provides the same search functionality as the human-facing UI.
+    """
     
     name: str = "Recipe Search Tool"
-    description: str = "Searches for recipes in the database using various criteria like ingredients, cuisine, dietary restrictions, etc."
+    description: str = """Searches for recipes in the database using structured filters and/or natural language queries.
+
+STRUCTURED FILTERS (use 'filters' parameter):
+- name: Recipe name (partial match)
+- ingredients: List of ingredient names to search for
+- meal_types: Filter by meal type - 'breakfast', 'lunch', 'dinner', 'snack', 'dessert'
+- cuisine: Cuisine type - 'american', 'italian', 'mexican', 'chinese', 'japanese', 'indian', 'french', 'thai', 'greek', 'mediterranean', 'spanish', 'korean', 'vietnamese', 'middle_eastern', 'african', 'fusion', 'other'
+- dietary_tags: List of dietary restrictions - 'vegetarian', 'vegan', 'gluten_free', 'dairy_free', 'nut_free', 'low_carb', 'keto', 'paleo', etc.
+- difficulty: 'easy', 'medium', or 'hard'
+- max_prep_time: Maximum prep time in minutes
+- max_cook_time: Maximum cook time in minutes
+- max_total_time: Maximum total time in minutes
+
+SEMANTIC SEARCH (use 'query' parameter):
+- Natural language query like "quick weeknight chicken dinners" or "healthy vegetarian lunches"
+- Finds recipes by meaning, not just keyword matching
+
+OPTIONS:
+- limit: Maximum number of results (default 20, max 100)
+- use_semantic: Whether to use AI-powered semantic search (default true)
+
+EXAMPLES:
+- Find breakfast recipes: {"filters": {"meal_types": ["breakfast"]}}
+- Find quick Italian dinners: {"filters": {"cuisine": "italian", "max_total_time": 30}, "query": "easy weeknight dinner"}
+- Semantic search: {"query": "kabob dinners for a summer party"}
+"""
     
-    def _get_recipe_repo(self):
-        """Get recipe repository instance (lazy initialization)."""
-        if not hasattr(self, '_recipe_repo'):
-            self._recipe_repo = RecipeRepository()
-        return self._recipe_repo
+    def _get_search_service(self):
+        """Get search service instance (lazy initialization)."""
+        if not hasattr(self, '_search_service'):
+            self._search_service = _get_recipe_search_service()
+        return self._search_service
     
     def _run(self, search_criteria: Dict[str, Any]) -> Dict[str, Any]:
         """
         Search for recipes based on criteria.
         
         Args:
-            search_criteria: Dictionary containing search parameters like:
-                - name: Recipe name (partial match)
-                - cuisine: Cuisine type
-                - dietary_tags: List of dietary tags
-                - ingredients: List of ingredients to include
-                - max_prep_time: Maximum prep time in minutes
-                - max_cook_time: Maximum cook time in minutes
-                - difficulty: Difficulty level
-                - servings: Number of servings
+            search_criteria: Dictionary containing search parameters:
+                - filters: Dictionary of structured filters (name, ingredients, meal_types, cuisine, etc.)
+                - query: Natural language search query for semantic search
+                - limit: Maximum number of results (default 20)
+                - use_semantic: Whether to use semantic search (default True)
             
         Returns:
             Dictionary with search results and metadata
         """
         try:
-            repo = self._get_recipe_repo()
+            search_service = self._get_search_service()
             
-            # Use the repository's search_recipes method
-            recipes = repo.search_recipes(
-                search_term=search_criteria.get('name'),
-                cuisine=search_criteria.get('cuisine'),
-                dietary_tags=search_criteria.get('dietary_tags'),
-                max_prep_time=search_criteria.get('max_prep_time'),
-                max_cook_time=search_criteria.get('max_cook_time'),
-                difficulty=search_criteria.get('difficulty'),
-                limit=search_criteria.get('limit', 20)
+            # Extract parameters
+            filters = search_criteria.get('filters', {})
+            query = search_criteria.get('query')
+            limit = search_criteria.get('limit', 20)
+            use_semantic = search_criteria.get('use_semantic', True)
+            
+            # Handle legacy format where filters are at the top level
+            if not filters and not query:
+                # Check for legacy parameters at top level
+                legacy_keys = ['name', 'cuisine', 'dietary_tags', 'ingredients', 
+                              'max_prep_time', 'max_cook_time', 'difficulty', 'meal_types']
+                filters = {k: v for k, v in search_criteria.items() if k in legacy_keys and v is not None}
+            
+            # Use the unified search service
+            result = search_service.search_dict(
+                filters=filters if filters else None,
+                query=query,
+                limit=limit,
+                use_semantic=use_semantic
             )
             
-            # Convert to dictionaries for JSON serialization
-            recipe_dicts = []
-            for recipe in recipes:
-                if hasattr(recipe, 'model_dump'):
-                    recipe_dict = recipe.model_dump()
-                elif hasattr(recipe, 'dict'):
-                    recipe_dict = recipe.dict()
-                else:
-                    recipe_dict = recipe.__dict__
-                recipe_dicts.append(recipe_dict)
-            
-            # Filter by ingredients if specified (post-processing)
-            if 'ingredients' in search_criteria:
-                required_ingredients = set(ing.lower() for ing in search_criteria['ingredients'])
-                filtered_recipes = []
-                
-                for recipe_dict in recipe_dicts:
-                    # Get recipe with ingredients
-                    full_recipe = repo.get_recipe_with_ingredients(recipe_dict['id'])
-                    if full_recipe and hasattr(full_recipe, 'ingredients'):
-                        recipe_ingredients = set(
-                            ing.ingredient.name.lower() if hasattr(ing, 'ingredient') else str(ing).lower()
-                            for ing in full_recipe.ingredients
-                        )
-                        if required_ingredients.issubset(recipe_ingredients):
-                            filtered_recipes.append(recipe_dict)
-                
-                recipe_dicts = filtered_recipes
-            
-            # Sort results by relevance (simple scoring)
-            recipe_dicts = self._score_and_sort_results(recipe_dicts, search_criteria)
-            
+            # Format response for agent consumption
             return {
-                "status": "success",
-                "recipes": recipe_dicts,
-                "count": len(recipe_dicts),
+                "status": result.get("status", "success"),
+                "recipes": [r["recipe"] for r in result.get("recipes", [])],
+                "count": result.get("total", 0),
                 "search_criteria": search_criteria,
-                "message": f"Found {len(recipe_dicts)} matching recipes"
+                "message": f"Found {result.get('total', 0)} matching recipes",
+                "relevance_scores": {
+                    r["recipe"].get("id", i): r["relevance_score"] 
+                    for i, r in enumerate(result.get("recipes", []))
+                }
             }
             
         except Exception as e:
@@ -421,33 +436,4 @@ class RecipeSearchTool(BaseTool):
                 "recipes": [],
                 "count": 0,
                 "message": f"Search failed: {str(e)}"
-            }
-    
-    def _score_and_sort_results(self, recipes: List[Dict[str, Any]], 
-                               criteria: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Score and sort search results by relevance."""
-        for recipe in recipes:
-            score = 0
-            
-            # Boost score for exact name matches
-            if 'name' in criteria:
-                if criteria['name'].lower() in recipe.get('name', '').lower():
-                    score += 10
-            
-            # Boost score for matching difficulty preference
-            if 'difficulty' in criteria:
-                if recipe.get('difficulty') == criteria['difficulty']:
-                    score += 5
-            
-            # Boost score for appropriate prep time
-            max_prep = criteria.get('max_prep_time')
-            if max_prep and recipe.get('prep_time', 0) <= max_prep:
-                score += 3
-            
-            recipe['_search_score'] = score
-        
-        # Sort by score (descending) then by name
-        return sorted(
-            recipes,
-            key=lambda r: (-r.get('_search_score', 0), r.get('name', ''))
-        ) 
+            } 

@@ -41,6 +41,8 @@ export type DietaryTag =
   | 'whole30' | 'low_sodium' | 'low_fat' | 'high_protein'
   | 'diabetic_friendly' | 'heart_healthy';
 
+export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack' | 'dessert';
+
 export interface Recipe {
   id: number;
   name: string;
@@ -52,6 +54,7 @@ export interface Recipe {
   difficulty: DifficultyLevel;
   cuisine: CuisineType;
   dietary_tags: DietaryTag[];
+  meal_types?: MealType[];
   ingredients: RecipeIngredient[];
   instructions: string[];
   notes?: string;
@@ -60,6 +63,43 @@ export interface Recipe {
   nutritional_info?: NutritionalInfo;
   created_at?: string;
   updated_at?: string;
+}
+
+// Recipe Search types
+export interface RecipeSearchFilters {
+  name?: string;
+  ingredients?: string[];
+  meal_types?: MealType[];
+  cuisine?: CuisineType;
+  dietary_tags?: DietaryTag[];
+  difficulty?: DifficultyLevel;
+  max_prep_time?: number;
+  max_cook_time?: number;
+  max_total_time?: number;
+}
+
+export interface RecipeSearchRequest {
+  filters?: RecipeSearchFilters;
+  query?: string;
+  use_semantic?: boolean;
+  limit?: number;
+  offset?: number;
+}
+
+export interface RecipeSearchResult {
+  recipe: Recipe;
+  relevance_score: number;
+  match_reasons: string[];
+}
+
+export interface RecipeSearchResponse {
+  status: string;
+  recipes: RecipeSearchResult[];
+  total: number;
+  limit: number;
+  offset: number;
+  query?: string;
+  filters_applied?: RecipeSearchFilters;
 }
 
 // Meal Plan types

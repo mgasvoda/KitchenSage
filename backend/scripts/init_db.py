@@ -39,6 +39,7 @@ def create_database():
             difficulty TEXT,
             cuisine TEXT,
             dietary_tags TEXT,
+            meal_types TEXT,
             instructions TEXT,
             notes TEXT,
             source TEXT,
@@ -180,6 +181,25 @@ def create_database():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
+    ''')
+    
+    # Recipe embeddings table for semantic search
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS recipe_embeddings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            recipe_id INTEGER UNIQUE NOT NULL,
+            embedding BLOB NOT NULL,
+            model TEXT DEFAULT 'text-embedding-3-small',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (recipe_id) REFERENCES recipes (id) ON DELETE CASCADE
+        )
+    ''')
+    
+    # Create index for faster recipe embedding lookups
+    cursor.execute('''
+        CREATE INDEX IF NOT EXISTS idx_recipe_embeddings_recipe_id 
+        ON recipe_embeddings(recipe_id)
     ''')
     
     # Commit changes and close connection

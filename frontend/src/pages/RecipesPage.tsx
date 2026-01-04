@@ -1,36 +1,113 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { recipeApi, groceryListApi } from '../services/api';
-import type { Recipe } from '../types';
+import type { Recipe, MealType, CuisineType, DifficultyLevel } from '../types';
+
+// Filter options
+const MEAL_TYPES: { value: MealType; label: string }[] = [
+  { value: 'breakfast', label: 'Breakfast' },
+  { value: 'lunch', label: 'Lunch' },
+  { value: 'dinner', label: 'Dinner' },
+  { value: 'snack', label: 'Snack' },
+  { value: 'dessert', label: 'Dessert' },
+];
+
+const CUISINES: { value: CuisineType; label: string }[] = [
+  { value: 'american', label: 'American' },
+  { value: 'italian', label: 'Italian' },
+  { value: 'mexican', label: 'Mexican' },
+  { value: 'chinese', label: 'Chinese' },
+  { value: 'japanese', label: 'Japanese' },
+  { value: 'indian', label: 'Indian' },
+  { value: 'french', label: 'French' },
+  { value: 'thai', label: 'Thai' },
+  { value: 'greek', label: 'Greek' },
+  { value: 'mediterranean', label: 'Mediterranean' },
+  { value: 'korean', label: 'Korean' },
+  { value: 'vietnamese', label: 'Vietnamese' },
+  { value: 'middle_eastern', label: 'Middle Eastern' },
+  { value: 'other', label: 'Other' },
+];
+
+const DIFFICULTIES: { value: DifficultyLevel; label: string }[] = [
+  { value: 'easy', label: 'Easy' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'hard', label: 'Hard' },
+];
 
 export function RecipesPage() {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [search, setSearch] = useState('');
+  const [totalResults, setTotalResults] = useState(0);
+  
+  // Search and filter state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedMealTypes, setSelectedMealTypes] = useState<MealType[]>([]);
+  const [selectedCuisine, setSelectedCuisine] = useState<CuisineType | ''>('');
+  const [selectedDifficulty, setSelectedDifficulty] = useState<DifficultyLevel | ''>('');
+  const [maxPrepTime, setMaxPrepTime] = useState<number | ''>('');
+  const [maxTotalTime, setMaxTotalTime] = useState<number | ''>('');
+  const [showFilters, setShowFilters] = useState(false);
+  
+  // UI state
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
   const [addingToGrocery, setAddingToGrocery] = useState(false);
   const [groceryMessage, setGroceryMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  useEffect(() => {
-    loadRecipes();
-  }, []);
-
-  const loadRecipes = async (searchTerm?: string) => {
+  const loadRecipes = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await recipeApi.list({ search: searchTerm, limit: 50 });
-      setRecipes(response.recipes || []);
+      
+      // Build search params
+      const params: Record<string, unknown> = { limit: 50 };
+      
+      if (searchQuery) params.query = searchQuery;
+      if (selectedMealTypes.length > 0) params.meal_types = selectedMealTypes;
+      if (selectedCuisine) params.cuisine = selectedCuisine;
+      if (selectedDifficulty) params.difficulty = selectedDifficulty;
+      if (maxPrepTime) params.max_prep_time = maxPrepTime;
+      if (maxTotalTime) params.max_total_time = maxTotalTime;
+      
+      // Use the advanced search endpoint
+      const response = await recipeApi.search(params);
+      
+      // Extract recipes from the response
+      const recipeList = response.recipes?.map(r => r.recipe) || [];
+      setRecipes(recipeList);
+      setTotalResults(response.total || recipeList.length);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load recipes');
     } finally {
       setLoading(false);
     }
-  };
+  }, [searchQuery, selectedMealTypes, selectedCuisine, selectedDifficulty, maxPrepTime, maxTotalTime]);
+
+  useEffect(() => {
+    loadRecipes();
+  }, [loadRecipes]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    loadRecipes(search);
+    loadRecipes();
+  };
+
+  const clearFilters = () => {
+    setSelectedMealTypes([]);
+    setSelectedCuisine('');
+    setSelectedDifficulty('');
+    setMaxPrepTime('');
+    setMaxTotalTime('');
+  };
+
+  const hasActiveFilters = selectedMealTypes.length > 0 || selectedCuisine || selectedDifficulty || maxPrepTime || maxTotalTime;
+
+  const toggleMealType = (type: MealType) => {
+    setSelectedMealTypes(prev => 
+      prev.includes(type) 
+        ? prev.filter(t => t !== type)
+        : [...prev, type]
+    );
   };
 
   const getDifficultyColor = (difficulty: string) => {
@@ -68,7 +145,7 @@ export function RecipesPage() {
           <div>
             <h1 className="text-2xl font-display font-bold text-sage-800">Recipes</h1>
             <p className="text-sage-600 text-sm mt-1">
-              Browse and manage your recipe collection
+              {loading ? 'Loading...' : `${totalResults} recipe${totalResults !== 1 ? 's' : ''} found`}
             </p>
           </div>
           <button className="px-4 py-2 bg-terracotta-500 hover:bg-terracotta-600 text-white rounded-lg font-medium transition-colors flex items-center gap-2">
@@ -79,22 +156,140 @@ export function RecipesPage() {
           </button>
         </div>
 
-        {/* Search */}
+        {/* Search Bar */}
         <form onSubmit={handleSearch} className="mt-4 flex gap-3">
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search recipes..."
-            className="flex-1 max-w-md px-4 py-2 bg-cream-50 border border-cream-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-400 text-sage-800"
-          />
+          <div className="flex-1 max-w-xl relative">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search recipes... (try 'quick weeknight dinners' or 'healthy vegetarian')"
+              className="w-full px-4 py-2 pl-10 bg-cream-50 border border-cream-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-400 text-sage-800"
+            />
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-sage-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
           <button
             type="submit"
             className="px-4 py-2 bg-sage-600 hover:bg-sage-700 text-white rounded-lg font-medium transition-colors"
           >
             Search
           </button>
+          <button
+            type="button"
+            onClick={() => setShowFilters(!showFilters)}
+            className={`px-4 py-2 border rounded-lg font-medium transition-colors flex items-center gap-2 ${
+              showFilters || hasActiveFilters
+                ? 'bg-sage-100 border-sage-400 text-sage-700'
+                : 'bg-white border-cream-300 text-sage-600 hover:bg-cream-50'
+            }`}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+            </svg>
+            Filters
+            {hasActiveFilters && (
+              <span className="ml-1 px-1.5 py-0.5 bg-terracotta-500 text-white text-xs rounded-full">
+                {[selectedMealTypes.length > 0, selectedCuisine, selectedDifficulty, maxPrepTime, maxTotalTime].filter(Boolean).length}
+              </span>
+            )}
+          </button>
         </form>
+
+        {/* Expandable Filters */}
+        {showFilters && (
+          <div className="mt-4 p-4 bg-cream-50 rounded-lg border border-cream-200 animate-fade-in">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Meal Type */}
+              <div>
+                <label className="block text-sm font-medium text-sage-700 mb-2">Meal Type</label>
+                <div className="flex flex-wrap gap-2">
+                  {MEAL_TYPES.map(({ value, label }) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => toggleMealType(value)}
+                      className={`px-3 py-1.5 text-sm rounded-full transition-colors ${
+                        selectedMealTypes.includes(value)
+                          ? 'bg-sage-600 text-white'
+                          : 'bg-white border border-cream-300 text-sage-600 hover:bg-cream-100'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Cuisine */}
+              <div>
+                <label className="block text-sm font-medium text-sage-700 mb-2">Cuisine</label>
+                <select
+                  value={selectedCuisine}
+                  onChange={(e) => setSelectedCuisine(e.target.value as CuisineType | '')}
+                  className="w-full px-3 py-2 bg-white border border-cream-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-400 text-sage-800"
+                >
+                  <option value="">Any Cuisine</option>
+                  {CUISINES.map(({ value, label }) => (
+                    <option key={value} value={value}>{label}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Difficulty */}
+              <div>
+                <label className="block text-sm font-medium text-sage-700 mb-2">Difficulty</label>
+                <select
+                  value={selectedDifficulty}
+                  onChange={(e) => setSelectedDifficulty(e.target.value as DifficultyLevel | '')}
+                  className="w-full px-3 py-2 bg-white border border-cream-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-400 text-sage-800"
+                >
+                  <option value="">Any Difficulty</option>
+                  {DIFFICULTIES.map(({ value, label }) => (
+                    <option key={value} value={value}>{label}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Time Filters */}
+              <div>
+                <label className="block text-sm font-medium text-sage-700 mb-2">Max Time</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="number"
+                    value={maxPrepTime}
+                    onChange={(e) => setMaxPrepTime(e.target.value ? parseInt(e.target.value) : '')}
+                    placeholder="Prep (min)"
+                    min="0"
+                    className="w-full px-3 py-2 bg-white border border-cream-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-400 text-sage-800 text-sm"
+                  />
+                  <input
+                    type="number"
+                    value={maxTotalTime}
+                    onChange={(e) => setMaxTotalTime(e.target.value ? parseInt(e.target.value) : '')}
+                    placeholder="Total (min)"
+                    min="0"
+                    className="w-full px-3 py-2 bg-white border border-cream-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-400 text-sage-800 text-sm"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Filter Actions */}
+            {hasActiveFilters && (
+              <div className="mt-4 flex justify-end">
+                <button
+                  type="button"
+                  onClick={clearFilters}
+                  className="text-sm text-sage-600 hover:text-sage-800 underline"
+                >
+                  Clear all filters
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </header>
 
       {/* Content */}
@@ -216,6 +411,11 @@ export function RecipesPage() {
                 <span className="px-3 py-1 bg-sage-100 text-sage-700 rounded-full text-sm">
                   {selectedRecipe.cuisine}
                 </span>
+                {selectedRecipe.meal_types?.map((type) => (
+                  <span key={type} className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm">
+                    {type}
+                  </span>
+                ))}
                 {selectedRecipe.dietary_tags?.map((tag) => (
                   <span key={tag} className="px-3 py-1 bg-terracotta-100 text-terracotta-700 rounded-full text-sm">
                     {tag.replace('_', ' ')}

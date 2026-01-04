@@ -5,12 +5,12 @@ This module contains all the data models used throughout the application,
 providing type safety, validation, and serialization capabilities.
 """
 
-from .recipe import Recipe, RecipeCreate, RecipeUpdate, DifficultyLevel, CuisineType, DietaryTag
+from .recipe import Recipe, RecipeCreate, RecipeUpdate, DifficultyLevel, CuisineType, DietaryTag, MealType
 from .ingredient import (
     Ingredient, IngredientCreate, IngredientUpdate, RecipeIngredient,
     IngredientCategory, MeasurementUnit
 )
-from .meal_plan import MealPlan, MealPlanCreate, MealPlanUpdate, Meal, MealType
+from .meal_plan import MealPlan, MealPlanCreate, MealPlanUpdate, Meal
 from .grocery_list import (
     GroceryList, GroceryListCreate, GroceryItem, GroceryItemCreate,
     GroceryItemStatus

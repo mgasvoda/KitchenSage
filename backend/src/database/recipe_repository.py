@@ -10,7 +10,7 @@ from typing import Dict, Any, List, Optional
 from datetime import datetime
 
 from src.models import Recipe, RecipeCreate, RecipeUpdate, RecipeIngredient, Ingredient
-from src.models import DifficultyLevel, CuisineType, DietaryTag, MeasurementUnit, IngredientCategory
+from src.models import DifficultyLevel, CuisineType, DietaryTag, MealType, MeasurementUnit, IngredientCategory
 from .base_repository import BaseRepository
 from .connection import get_db_session, RecordNotFoundError, ValidationError
 
@@ -120,6 +120,13 @@ class RecipeRepository(BaseRepository[Recipe]):
     
     def _row_to_model(self, row: sqlite3.Row) -> Recipe:
         """Convert database row to Recipe model."""
+        # Parse meal_types from JSON, handling potential missing column in older databases
+        meal_types_raw = []
+        try:
+            meal_types_raw = json.loads(row['meal_types']) if row['meal_types'] else []
+        except (KeyError, IndexError):
+            meal_types_raw = []
+        
         recipe = Recipe(
             id=row['id'],
             name=row['name'],
@@ -130,6 +137,7 @@ class RecipeRepository(BaseRepository[Recipe]):
             difficulty=DifficultyLevel(row['difficulty']) if row['difficulty'] else DifficultyLevel.MEDIUM,
             cuisine=CuisineType(row['cuisine']) if row['cuisine'] else CuisineType.OTHER,
             dietary_tags=json.loads(row['dietary_tags']) if row['dietary_tags'] else [],
+            meal_types=meal_types_raw,
             instructions=json.loads(row['instructions']) if row['instructions'] else [],
             notes=row['notes'],
             source=row['source'],
@@ -140,6 +148,9 @@ class RecipeRepository(BaseRepository[Recipe]):
         
         # Convert dietary tags to enum
         recipe.dietary_tags = [DietaryTag(tag) for tag in recipe.dietary_tags if tag in DietaryTag._value2member_map_]
+        
+        # Convert meal types to enum
+        recipe.meal_types = [MealType(mt) for mt in meal_types_raw if mt in MealType._value2member_map_]
         
         return recipe
     
@@ -154,6 +165,7 @@ class RecipeRepository(BaseRepository[Recipe]):
             'difficulty': model.difficulty.value if model.difficulty else None,
             'cuisine': model.cuisine.value if model.cuisine else None,
             'dietary_tags': json.dumps([tag.value for tag in model.dietary_tags]),
+            'meal_types': json.dumps([mt.value for mt in model.meal_types]),
             'instructions': json.dumps(model.instructions),
             'notes': model.notes,
             'source': model.source,
@@ -197,6 +209,7 @@ class RecipeRepository(BaseRepository[Recipe]):
                 'difficulty': recipe_create.difficulty.value,
                 'cuisine': recipe_create.cuisine.value,
                 'dietary_tags': json.dumps([tag.value for tag in recipe_create.dietary_tags]),
+                'meal_types': json.dumps([mt.value for mt in recipe_create.meal_types]),
                 'instructions': json.dumps(recipe_create.instructions),
                 'notes': recipe_create.notes,
                 'source': recipe_create.source,
@@ -401,6 +414,7 @@ class RecipeRepository(BaseRepository[Recipe]):
                       search_term: Optional[str] = None,
                       cuisine: Optional[CuisineType] = None,
                       dietary_tags: Optional[List[DietaryTag]] = None,
+                      meal_types: Optional[List[MealType]] = None,
                       max_prep_time: Optional[int] = None,
                       max_cook_time: Optional[int] = None,
                       difficulty: Optional[DifficultyLevel] = None,
@@ -412,6 +426,7 @@ class RecipeRepository(BaseRepository[Recipe]):
             search_term: Search in recipe name and description
             cuisine: Filter by cuisine type
             dietary_tags: Filter by dietary restrictions (recipe must have ALL tags)
+            meal_types: Filter by meal types (recipe must have at least one matching type)
             max_prep_time: Maximum preparation time in minutes
             max_cook_time: Maximum cooking time in minutes
             difficulty: Filter by difficulty level
@@ -454,6 +469,14 @@ class RecipeRepository(BaseRepository[Recipe]):
                 for tag in dietary_tags:
                     query_parts.append("AND dietary_tags LIKE ?")
                     params.append(f'%"{tag.value}"%')
+            
+            # Meal types filter (match any of the provided types)
+            if meal_types:
+                meal_type_conditions = []
+                for mt in meal_types:
+                    meal_type_conditions.append("meal_types LIKE ?")
+                    params.append(f'%"{mt.value}"%')
+                query_parts.append(f"AND ({' OR '.join(meal_type_conditions)})")
             
             query_parts.append("ORDER BY name LIMIT ?")
             params.append(limit)
@@ -539,6 +562,8 @@ class RecipeRepository(BaseRepository[Recipe]):
                 update_data['cuisine'] = recipe_update.cuisine.value
             if recipe_update.dietary_tags is not None:
                 update_data['dietary_tags'] = json.dumps([tag.value for tag in recipe_update.dietary_tags])
+            if recipe_update.meal_types is not None:
+                update_data['meal_types'] = json.dumps([mt.value for mt in recipe_update.meal_types])
             if recipe_update.instructions is not None:
                 update_data['instructions'] = json.dumps(recipe_update.instructions)
             if recipe_update.notes is not None:

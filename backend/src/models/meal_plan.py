@@ -5,18 +5,8 @@ Meal plan data models for organizing recipes into scheduled meals.
 from pydantic import BaseModel, Field, validator
 from typing import Optional, List, Dict
 from datetime import datetime, date
-from enum import Enum
 
-from .recipe import Recipe, DietaryTag
-
-
-class MealType(str, Enum):
-    """Types of meals in a day."""
-    BREAKFAST = "breakfast"
-    LUNCH = "lunch"
-    DINNER = "dinner"
-    SNACK = "snack"
-    DESSERT = "dessert"
+from .recipe import Recipe, DietaryTag, MealType
 
 
 class Meal(BaseModel):

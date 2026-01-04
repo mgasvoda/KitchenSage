@@ -46,14 +46,47 @@ async function fetchApi<T>(
   return response.json();
 }
 
+// Recipe Search types for API
+interface RecipeSearchParams {
+  name?: string;
+  ingredients?: string[];
+  meal_types?: string[];
+  cuisine?: string;
+  dietary_tags?: string[];
+  difficulty?: string;
+  max_prep_time?: number;
+  max_cook_time?: number;
+  max_total_time?: number;
+  query?: string;
+  use_semantic?: boolean;
+  limit?: number;
+  offset?: number;
+}
+
+interface RecipeSearchResponse {
+  status: string;
+  recipes: Array<{
+    recipe: Recipe;
+    relevance_score: number;
+    match_reasons: string[];
+  }>;
+  total: number;
+  limit: number;
+  offset: number;
+  query?: string;
+  filters_applied?: Record<string, unknown>;
+}
+
 // Recipe API
 export const recipeApi = {
   list: async (params?: {
     search?: string;
     cuisine?: string;
     dietary_tags?: string[];
+    meal_types?: string[];
     difficulty?: string;
     max_prep_time?: number;
+    max_cook_time?: number;
     limit?: number;
     offset?: number;
   }): Promise<RecipeListResponse> => {
@@ -71,6 +104,17 @@ export const recipeApi = {
     }
     const query = searchParams.toString();
     return fetchApi<RecipeListResponse>(`/recipes${query ? `?${query}` : ''}`);
+  },
+
+  /**
+   * Advanced recipe search with structured filters and semantic search.
+   * Provides the same functionality as the AI agent tools.
+   */
+  search: async (params: RecipeSearchParams): Promise<RecipeSearchResponse> => {
+    return fetchApi<RecipeSearchResponse>('/recipes/search', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    });
   },
 
   get: async (id: number): Promise<{ status: string; recipe: Recipe }> => {
@@ -115,6 +159,24 @@ export const recipeApi = {
       }
     });
     return fetchApi(`/recipes/discover?${searchParams.toString()}`, {
+      method: 'POST',
+    });
+  },
+
+  /**
+   * Generate embedding for a specific recipe.
+   */
+  embedRecipe: async (id: number): Promise<{ status: string; message: string }> => {
+    return fetchApi(`/recipes/${id}/embed`, {
+      method: 'POST',
+    });
+  },
+
+  /**
+   * Generate embeddings for all recipes (admin operation).
+   */
+  embedAllRecipes: async (): Promise<{ status: string; message: string; embedded_count: number }> => {
+    return fetchApi('/recipes/embed-all', {
       method: 'POST',
     });
   },

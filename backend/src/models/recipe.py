@@ -11,6 +11,15 @@ from .ingredient import RecipeIngredient
 from .nutritional_info import NutritionalInfo
 
 
+class MealType(str, Enum):
+    """Types of meals a recipe is suitable for."""
+    BREAKFAST = "breakfast"
+    LUNCH = "lunch"
+    DINNER = "dinner"
+    SNACK = "snack"
+    DESSERT = "dessert"
+
+
 class DifficultyLevel(str, Enum):
     """Recipe difficulty levels."""
     EASY = "easy"
@@ -81,6 +90,7 @@ class Recipe(BaseModel):
     difficulty: DifficultyLevel = Field(default=DifficultyLevel.MEDIUM, description="Recipe difficulty")
     cuisine: CuisineType = Field(default=CuisineType.OTHER, description="Cuisine type")
     dietary_tags: List[DietaryTag] = Field(default_factory=list, description="Dietary restrictions and tags")
+    meal_types: List[MealType] = Field(default_factory=list, description="Meal types this recipe is suitable for")
     
     # Recipe content
     ingredients: List[RecipeIngredient] = Field(default_factory=list, description="Recipe ingredients")
@@ -130,6 +140,7 @@ class Recipe(BaseModel):
                 "difficulty": "easy",
                 "cuisine": "chinese",
                 "dietary_tags": ["gluten_free", "high_protein"],
+                "meal_types": ["lunch", "dinner"],
                 "instructions": [
                     "Cut chicken into bite-sized pieces",
                     "Heat oil in wok over high heat",
@@ -168,6 +179,7 @@ class RecipeCreate(BaseModel):
     difficulty: DifficultyLevel = DifficultyLevel.MEDIUM
     cuisine: CuisineType = CuisineType.OTHER
     dietary_tags: List[DietaryTag] = Field(default_factory=list)
+    meal_types: List[MealType] = Field(default_factory=list)
     instructions: List[str] = Field(..., min_items=1)
     notes: Optional[str] = Field(None, max_length=500)
     source: Optional[str] = Field(None, max_length=200)
@@ -195,6 +207,7 @@ class RecipeUpdate(BaseModel):
     difficulty: Optional[DifficultyLevel] = None
     cuisine: Optional[CuisineType] = None
     dietary_tags: Optional[List[DietaryTag]] = None
+    meal_types: Optional[List[MealType]] = None
     instructions: Optional[List[str]] = Field(None, min_items=1)
     notes: Optional[str] = Field(None, max_length=500)
     source: Optional[str] = Field(None, max_length=200)

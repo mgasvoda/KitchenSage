@@ -13,6 +13,7 @@ dependencies = [
     "fastapi>=0.104.0",
     "langchain>=0.1.0",
     "langchain-openai>=0.1.0",
+    "numpy>=1.24.0",
     "openai>=1.75.0",
     "openinference-instrumentation-crewai>=0.1.9",
     "openinference-instrumentation-langchain>=0.1.43",
@@ -25,6 +26,7 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "requests>=2.31.0",
     "rich>=13.9.4",
+    "sqlite-vec>=0.1.1",
     "typing-extensions>=4.8.0",
     "uvicorn>=0.24.0",
 ]
