@@ -113,7 +113,7 @@ class KitchenCrew:
     def create_meal_plan(self,
                         days: int = 7,
                         people: int = 2,
-                        dietary_restrictions: Optional[List[str]] = None,
+                        prompt: Optional[str] = None,
                         budget: Optional[float] = None) -> Dict[str, Any]:
         """
         Create a meal plan for specified parameters.
@@ -121,7 +121,7 @@ class KitchenCrew:
         Args:
             days: Number of days for the meal plan
             people: Number of people the plan should serve
-            dietary_restrictions: List of dietary restrictions
+            prompt: Free-form preferences and instructions
             budget: Optional budget constraint
             
         Returns:
@@ -133,7 +133,7 @@ class KitchenCrew:
         meal_plan_task = self.meal_planning_tasks.create_meal_plan_task(
             days=days,
             people=people,
-            dietary_restrictions=dietary_restrictions,
+            prompt=prompt,
             budget=budget
         )
         meal_plan_task.agent = self.meal_planner.agent
@@ -157,7 +157,7 @@ class KitchenCrew:
         self,
         days: int = 7,
         people: int = 2,
-        dietary_restrictions: Optional[List[str]] = None,
+        prompt: Optional[str] = None,
         budget: Optional[float] = None,
         event_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
     ) -> Dict[str, Any]:
@@ -167,7 +167,7 @@ class KitchenCrew:
         Args:
             days: Number of days for the meal plan
             people: Number of people the plan should serve
-            dietary_restrictions: List of dietary restrictions
+            prompt: Free-form preferences and instructions
             budget: Optional budget constraint
             event_callback: Callback function to receive agent activity events
             
@@ -290,15 +290,15 @@ class KitchenCrew:
             event_callback({
                 "type": "agent_thinking",
                 "agent": "Meal Planning Expert",
-                "content": f"Analyzing requirements: {days} days, {people} people" + 
-                          (f", restrictions: {', '.join(dietary_restrictions)}" if dietary_restrictions else ""),
+                "content": f"Analyzing requirements: {days} days, {people} people" +
+                          (f", preferences: {prompt[:100]}..." if prompt and len(prompt) > 100 else (f", preferences: {prompt}" if prompt else "")),
             })
         
         # Create meal planning task with proper agent assignment
         meal_plan_task = self.meal_planning_tasks.create_meal_plan_task(
             days=days,
             people=people,
-            dietary_restrictions=dietary_restrictions,
+            prompt=prompt,
             budget=budget
         )
         meal_plan_task.agent = self.meal_planner.agent

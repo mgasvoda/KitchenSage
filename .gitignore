@@ -111,4 +111,5 @@ kitchen_crew.log
 
 # Service management
 .pids/
-logs/ 
+logs/
+frontend/.vite/*

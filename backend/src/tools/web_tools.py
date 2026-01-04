@@ -9,6 +9,7 @@ from crewai.tools import BaseTool
 from typing import Dict, List, Any, Optional
 from openai import OpenAI
 from datetime import datetime
+from src.config import settings
 
 
 class WebSearchTool(BaseTool):
@@ -63,7 +64,7 @@ class WebSearchTool(BaseTool):
                 "prep_time": 10,
                 "cook_time": 15,
                 "total_time": 25,
-                "servings": 4,
+                "servings": settings.recipe_discovery.default_servings_fallback,
                 "difficulty": "Easy",
                 "tags": ["vegetarian", "quick"],
                 "nutrition": {{"calories": 300, "protein": 12, "carbs": 45, "fat": 8}}
@@ -120,7 +121,7 @@ class WebSearchTool(BaseTool):
                                 recipe.setdefault('prep_time', 0)
                                 recipe.setdefault('cook_time', 0)
                                 recipe.setdefault('total_time', recipe.get('prep_time', 0) + recipe.get('cook_time', 0))
-                                recipe.setdefault('servings', 4)
+                                recipe.setdefault('servings', settings.recipe_discovery.default_servings_fallback)
                                 recipe.setdefault('difficulty', 'Medium')
                                 recipe.setdefault('tags', [])
                                 recipe.setdefault('source', 'web_search')
@@ -175,7 +176,7 @@ class WebSearchTool(BaseTool):
                 current_recipe['prep_time'] = 30
                 current_recipe['cook_time'] = 30
                 current_recipe['total_time'] = 60
-                current_recipe['servings'] = 4
+                current_recipe['servings'] = settings.recipe_discovery.default_servings_fallback
                 current_recipe['difficulty'] = 'Medium'
                 current_recipe['tags'] = []
         
@@ -236,7 +237,7 @@ class WebScrapingTool(BaseTool):
               "prep_time": 15,
               "cook_time": 30,
               "total_time": 45,
-              "servings": 4,
+              "servings": settings.recipe_discovery.default_servings_fallback,
               "difficulty": "Easy",
               "tags": ["vegetarian", "baking"],
               "nutrition": {{"calories": 250, "protein": 8}},
@@ -328,7 +329,7 @@ class WebScrapingTool(BaseTool):
                 "instructions": ["Unable to extract instructions"],
                 "prep_time": 0,
                 "cook_time": 0,
-                "servings": 4,
+                "servings": settings.recipe_discovery.default_servings_fallback,
                 "message": "Web scraping completed but content extraction was limited",
                 "error": "Could not fully parse recipe content"
             }]
@@ -363,7 +364,7 @@ class WebScrapingTool(BaseTool):
             "prep_time": 30,
             "cook_time": 30,
             "total_time": 60,
-            "servings": 4,
+            "servings": settings.recipe_discovery.default_servings_fallback,
             "difficulty": "Medium",
             "tags": [],
             "scraped_at": json.dumps({"timestamp": str(datetime.now())}),
@@ -427,7 +428,7 @@ class RecipeAPITool(BaseTool):
                 "prep_time": min(max_time // 2, 30),
                 "cook_time": min(max_time // 2, 30),
                 "total_time": max_time,
-                "servings": 4,
+                "servings": settings.recipe_discovery.default_servings_fallback,
                 "message": f"API search completed successfully using {api_name}"
             }
         ]

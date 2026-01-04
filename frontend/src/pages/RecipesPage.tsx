@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { recipeApi } from '../services/api';
+import { recipeApi, groceryListApi } from '../services/api';
 import type { Recipe } from '../types';
 
 export function RecipesPage() {
@@ -8,6 +8,8 @@ export function RecipesPage() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
+  const [addingToGrocery, setAddingToGrocery] = useState(false);
+  const [groceryMessage, setGroceryMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   useEffect(() => {
     loadRecipes();
@@ -37,6 +39,24 @@ export function RecipesPage() {
       case 'medium': return 'bg-yellow-100 text-yellow-700';
       case 'hard': return 'bg-red-100 text-red-700';
       default: return 'bg-gray-100 text-gray-700';
+    }
+  };
+
+  const handleAddToGroceryList = async (recipe: Recipe) => {
+    try {
+      setAddingToGrocery(true);
+      setGroceryMessage(null);
+      const response = await groceryListApi.addFromRecipe(recipe.id, recipe.servings);
+      setGroceryMessage({ type: 'success', text: response.message || 'Added to grocery list!' });
+      // Clear message after 3 seconds
+      setTimeout(() => setGroceryMessage(null), 3000);
+    } catch (err) {
+      setGroceryMessage({ 
+        type: 'error', 
+        text: err instanceof Error ? err.message : 'Failed to add to grocery list' 
+      });
+    } finally {
+      setAddingToGrocery(false);
     }
   };
 
@@ -247,6 +267,35 @@ export function RecipesPage() {
                   </ol>
                 </div>
               )}
+
+              {/* Grocery List Feedback */}
+              {groceryMessage && (
+                <div className={`mt-4 p-3 rounded-lg ${
+                  groceryMessage.type === 'success' 
+                    ? 'bg-green-50 text-green-700 border border-green-200' 
+                    : 'bg-red-50 text-red-700 border border-red-200'
+                }`}>
+                  {groceryMessage.text}
+                </div>
+              )}
+
+              {/* Footer with Action Button */}
+              <div className="mt-6 pt-4 border-t border-cream-200 flex justify-end">
+                <button
+                  onClick={() => handleAddToGroceryList(selectedRecipe)}
+                  disabled={addingToGrocery}
+                  className="px-4 py-2 bg-sage-600 text-white rounded-lg hover:bg-sage-700 transition-colors font-medium disabled:opacity-50 flex items-center gap-2"
+                >
+                  {addingToGrocery ? (
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                  ) : (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                  )}
+                  Add to Grocery List
+                </button>
+              </div>
             </div>
           </div>
         </div>

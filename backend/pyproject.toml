@@ -17,6 +17,7 @@ dependencies = [
     "openinference-instrumentation-crewai>=0.1.9",
     "openinference-instrumentation-langchain>=0.1.43",
     "openinference-instrumentation-litellm>=0.1.19",
+    "openinference-instrumentation-openai>=0.1.41",
     "pandas>=2.1.0",
     "pydantic>=2.0.0",
     "pytest>=7.4.0",

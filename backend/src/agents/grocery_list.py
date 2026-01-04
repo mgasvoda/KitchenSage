@@ -6,6 +6,7 @@ import os
 from crewai import Agent
 from src.tools.grocery_tools import InventoryTool, PriceComparisonTool, ListOptimizationTool
 from src.tools.database_tools import DatabaseTool
+from src.config import settings, is_reasoning_model
 
 
 class GroceryListAgent:
@@ -35,7 +36,14 @@ class GroceryListAgent:
             llm_config = {}
         else:
             from langchain_openai import ChatOpenAI
-            llm_config = {"llm": ChatOpenAI(model="gpt-4.1-mini", temperature=0.2)}
+            # Prefer the smallest reasonable model for list consolidation/organization.
+            # Can be overridden via env without code changes.
+            model = os.getenv("GROCERY_LIST_MODEL", "gpt-4o-mini")
+            try:
+                temperature = float(os.getenv("GROCERY_LIST_TEMPERATURE", "0.2"))
+            except ValueError:
+                temperature = 0.2
+            llm_config = {"llm": ChatOpenAI(model=model, temperature=temperature)}
         
         self.agent = Agent(
             role="Supply Chain Specialist and Shopping Optimization Expert",
@@ -44,10 +52,10 @@ class GroceryListAgent:
             shopping patterns, seasonal availability, and cost optimization strategies. 
             You understand how to consolidate ingredients efficiently, find the best 
             prices across different stores, and organize shopping lists for maximum 
-            efficiency. Your expertise includes inventory management, bulk purchasing 
+            efficiency. Your expertise includes inventory management, bulk purchasing
             strategies, and understanding ingredient substitutions for cost savings.""",
             tools=self.tools,
-            verbose=True,
+            verbose=settings.llm.agent_verbose,
             allow_delegation=False,
             **llm_config
         ) 

@@ -5,6 +5,7 @@ Recipe Scout Agent - Discovers and retrieves recipes from external sources.
 import os
 from crewai import Agent
 from src.tools.web_tools import WebSearchTool, WebScrapingTool, RecipeAPITool, ContentFilterTool
+from src.config import settings, is_reasoning_model
 
 
 class RecipeScoutAgent:
@@ -34,7 +35,14 @@ class RecipeScoutAgent:
             llm_config = {}
         else:
             from langchain_openai import ChatOpenAI
-            llm_config = {"llm": ChatOpenAI(model="gpt-4.1-mini", temperature=0.4)}
+            model = settings.llm.recipe_scout_model
+            llm_params = {"model": model}
+            # Reasoning models don't support temperature or stop parameters
+            if is_reasoning_model(model):
+                llm_params["disabled_params"] = {"stop": None}
+            else:
+                llm_params["temperature"] = settings.llm.recipe_scout_temperature
+            llm_config = {"llm": ChatOpenAI(**llm_params)}
         
         self.agent = Agent(
             role="Culinary Researcher and Recipe Discovery Specialist",
@@ -50,10 +58,10 @@ class RecipeScoutAgent:
             and preferences. When a user asks for a specific ingredient or dish (like 
             "pork tenderloin recipe"), you prioritize finding recipes that feature that 
             exact ingredient or dish prominently. You never ignore the user's specific 
-            request in favor of generic searches. You use web search tools to discover 
+            request in favor of generic searches. You use web search tools to discover
             the latest and most popular recipes online that match the user's exact needs.""",
             tools=self.tools,
-            verbose=True,
+            verbose=settings.llm.agent_verbose,
             allow_delegation=False,
             **llm_config
         ) 

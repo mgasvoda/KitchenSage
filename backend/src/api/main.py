@@ -18,6 +18,15 @@ if backend_dir not in sys.path:
 load_dotenv(os.path.join(backend_dir, '..', '.env'))
 load_dotenv()
 
+# Initialize telemetry as early as possible (before importing routes/services)
+try:
+    from src.utils.telemetry import initialize_phoenix_tracing
+
+    initialize_phoenix_tracing(project_name="kitchensage-api")
+    print("📊 Phoenix telemetry initialized")
+except Exception as e:
+    print(f"⚠️  Telemetry initialization skipped: {e}")
+
 from src.api.routes import recipes, meal_plans, grocery_lists, chat, pending_recipes
 
 
@@ -26,14 +35,6 @@ async def lifespan(app: FastAPI):
     """Application lifespan handler for startup and shutdown events."""
     # Startup
     print("🍳 KitchenSage API starting up...")
-    
-    # Initialize telemetry if available
-    try:
-        from src.utils.telemetry import initialize_phoenix_tracing
-        initialize_phoenix_tracing(project_name="kitchensage-api")
-        print("📊 Phoenix telemetry initialized")
-    except Exception as e:
-        print(f"⚠️  Telemetry initialization skipped: {e}")
     
     yield
     

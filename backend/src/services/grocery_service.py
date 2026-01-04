@@ -3,10 +3,15 @@ Grocery service - business logic layer for grocery list operations.
 """
 
 import logging
-from typing import Optional, Dict, Any
+import threading
+from typing import Optional, Dict, Any, List
 
-from src.database import GroceryRepository, DatabaseError, RecordNotFoundError
+from src.database import GroceryRepository, RecipeRepository, MealPlanRepository, DatabaseError, RecordNotFoundError
+from src.database.recipe_repository import IngredientRepository
 from src.crew import KitchenCrew
+from src.services.consolidation_service import GroceryConsolidationService
+from src.services.task_service import get_task_service, TaskStatus
+from src.utils.ingredient_matcher import IngredientMatcher
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +26,12 @@ class GroceryService:
     
     def __init__(self):
         self._grocery_repo = None
+        self._recipe_repo = None
+        self._meal_plan_repo = None
         self._kitchen_crew = None
+        self._consolidation_service = None
+        self._ingredient_repo = None
+        self._ingredient_matcher = None
     
     @property
     def grocery_repo(self) -> GroceryRepository:
@@ -31,12 +41,76 @@ class GroceryService:
         return self._grocery_repo
     
     @property
+    def recipe_repo(self) -> RecipeRepository:
+        """Lazy initialization of recipe repository."""
+        if self._recipe_repo is None:
+            self._recipe_repo = RecipeRepository()
+        return self._recipe_repo
+    
+    @property
+    def meal_plan_repo(self) -> MealPlanRepository:
+        """Lazy initialization of meal plan repository."""
+        if self._meal_plan_repo is None:
+            self._meal_plan_repo = MealPlanRepository()
+        return self._meal_plan_repo
+    
+    @property
     def kitchen_crew(self) -> KitchenCrew:
         """Lazy initialization of kitchen crew."""
         if self._kitchen_crew is None:
             self._kitchen_crew = KitchenCrew()
         return self._kitchen_crew
-    
+
+    @property
+    def consolidation_service(self) -> GroceryConsolidationService:
+        """Lazy initialization of consolidation service."""
+        if self._consolidation_service is None:
+            self._consolidation_service = GroceryConsolidationService()
+        return self._consolidation_service
+
+    @property
+    def ingredient_repo(self) -> IngredientRepository:
+        """Lazy initialization of ingredient repository."""
+        if self._ingredient_repo is None:
+            self._ingredient_repo = IngredientRepository()
+        return self._ingredient_repo
+
+    @property
+    def ingredient_matcher(self) -> IngredientMatcher:
+        """Lazy initialization of ingredient matcher."""
+        if self._ingredient_matcher is None:
+            self._ingredient_matcher = IngredientMatcher(self.ingredient_repo)
+        return self._ingredient_matcher
+
+    def _reconnect_ingredient_ids(
+        self,
+        consolidated_items: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """
+        Reconnect ingredient IDs to consolidated items using name matching.
+
+        Args:
+            consolidated_items: List of items with name, quantity, unit
+
+        Returns:
+            List of items with ingredient_id added
+        """
+        reconnected = []
+        for item in consolidated_items:
+            name = item.get('name', '')
+            ingredient_id = self.ingredient_matcher.find_ingredient_id(name)
+
+            if ingredient_id:
+                reconnected.append({
+                    **item,
+                    'ingredient_id': ingredient_id
+                })
+            else:
+                logger.warning(f"Could not match ingredient name '{name}' to database - skipping")
+
+        logger.info(f"Reconnected {len(reconnected)}/{len(consolidated_items)} items to ingredient IDs")
+        return reconnected
+
     def list_grocery_lists(
         self,
         limit: int = 20,
@@ -233,6 +307,331 @@ class GroceryService:
                 
         except Exception as e:
             logger.error(f"Error deleting grocery list {grocery_list_id}: {e}")
+            return {
+                "status": "error",
+                "message": str(e),
+            }
+    
+    def get_or_create_default_list(self) -> Dict[str, Any]:
+        """
+        Get the default grocery list, creating one if it doesn't exist.
+        
+        Returns:
+            Dictionary with grocery list data
+        """
+        try:
+            grocery_list = self.grocery_repo.get_or_create_default_list()
+            list_dict = grocery_list.model_dump() if hasattr(grocery_list, 'model_dump') else dict(grocery_list)
+            
+            return {
+                "status": "success",
+                "grocery_list": list_dict,
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting/creating default grocery list: {e}")
+            return {
+                "status": "error",
+                "message": str(e),
+            }
+    
+    def add_recipe_ingredients(
+        self,
+        recipe_id: int,
+        servings: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """
+        Add ingredients from a recipe to the grocery list.
+
+        Gets or creates the default grocery list, consolidates ingredients
+        using LLM, then merges them into the list.
+
+        Args:
+            recipe_id: ID of the recipe
+            servings: Number of servings (uses recipe default if not provided)
+
+        Returns:
+            Dictionary with result and updated grocery list
+        """
+        try:
+            # Get the recipe with ingredients
+            recipe = self.recipe_repo.get_recipe_with_ingredients(recipe_id)
+            if not recipe:
+                return {
+                    "status": "error",
+                    "message": f"Recipe with ID {recipe_id} not found",
+                }
+
+            # Get or create the grocery list
+            grocery_list = self.grocery_repo.get_or_create_default_list()
+
+            # Calculate serving multiplier
+            recipe_servings = recipe.servings or 1
+            target_servings = servings or recipe_servings
+            multiplier = target_servings / recipe_servings
+
+            # Collect raw items first
+            raw_items: List[Dict[str, Any]] = []
+            for recipe_ingredient in recipe.ingredients:
+                if not recipe_ingredient.ingredient_id:
+                    continue
+
+                adjusted_quantity = recipe_ingredient.quantity * multiplier
+                unit_value = recipe_ingredient.unit.value if hasattr(recipe_ingredient.unit, 'value') else str(recipe_ingredient.unit)
+
+                raw_items.append({
+                    'name': recipe_ingredient.ingredient.name if recipe_ingredient.ingredient else 'Unknown',
+                    'quantity': adjusted_quantity,
+                    'unit': unit_value,
+                    'ingredient_id': recipe_ingredient.ingredient_id
+                })
+
+            # Consolidate using LLM (returns items without ingredient_id)
+            consolidated_items = self.consolidation_service.consolidate_ingredients(raw_items)
+
+            # Reconnect ingredient IDs using name matching
+            items_with_ids = self._reconnect_ingredient_ids(consolidated_items)
+
+            # Add consolidated items to the list
+            items_added = 0
+            for item in items_with_ids:
+                ingredient_id = item.get('ingredient_id')
+                if not ingredient_id:
+                    continue
+
+                self.grocery_repo.add_or_merge_item(
+                    grocery_list_id=grocery_list.id,
+                    ingredient_id=ingredient_id,
+                    quantity=item.get('quantity', 0),
+                    unit=item.get('unit', 'piece')
+                )
+                items_added += 1
+
+            # Get updated list
+            updated_list = self.grocery_repo.get_or_create_default_list()
+            list_dict = updated_list.model_dump() if hasattr(updated_list, 'model_dump') else dict(updated_list)
+
+            return {
+                "status": "success",
+                "message": f"Added {items_added} ingredients from '{recipe.name}' to grocery list",
+                "grocery_list": list_dict,
+            }
+
+        except Exception as e:
+            logger.error(f"Error adding recipe ingredients: {e}")
+            return {
+                "status": "error",
+                "message": str(e),
+            }
+    
+    def add_meal_plan_ingredients(self, meal_plan_id: int) -> Dict[str, Any]:
+        """
+        Add all ingredients from a meal plan to the grocery list.
+
+        Gets or creates the default grocery list, consolidates all ingredients
+        using LLM, then merges them into the list.
+
+        Args:
+            meal_plan_id: ID of the meal plan
+
+        Returns:
+            Dictionary with result and updated grocery list
+        """
+        try:
+            # Get the meal plan with meals and recipes
+            meal_plan = self.meal_plan_repo.get_meal_plan_with_meals(meal_plan_id)
+            if not meal_plan:
+                return {
+                    "status": "error",
+                    "message": f"Meal plan with ID {meal_plan_id} not found",
+                }
+
+            # Get or create the grocery list
+            grocery_list = self.grocery_repo.get_or_create_default_list()
+
+            # Collect all raw items from all meals first
+            raw_items: List[Dict[str, Any]] = []
+
+            for meal in meal_plan.meals:
+                if not meal.recipe or not meal.recipe.ingredients:
+                    continue
+
+                # Calculate serving multiplier for this meal
+                effective_servings = meal.get_effective_servings() if hasattr(meal, 'get_effective_servings') else (meal.servings_override or meal.recipe.servings)
+                recipe_servings = meal.recipe.servings or 1
+                multiplier = effective_servings / recipe_servings
+
+                # Collect each ingredient
+                for recipe_ingredient in meal.recipe.ingredients:
+                    if not recipe_ingredient.ingredient_id:
+                        continue
+
+                    adjusted_quantity = recipe_ingredient.quantity * multiplier
+                    unit_value = recipe_ingredient.unit.value if hasattr(recipe_ingredient.unit, 'value') else str(recipe_ingredient.unit)
+
+                    raw_items.append({
+                        'name': recipe_ingredient.ingredient.name if recipe_ingredient.ingredient else 'Unknown',
+                        'quantity': adjusted_quantity,
+                        'unit': unit_value,
+                        'ingredient_id': recipe_ingredient.ingredient_id
+                    })
+
+            # Consolidate using LLM (returns items without ingredient_id)
+            consolidated_items = self.consolidation_service.consolidate_ingredients(raw_items)
+
+            # Reconnect ingredient IDs using name matching
+            items_with_ids = self._reconnect_ingredient_ids(consolidated_items)
+
+            # Add consolidated items to the list
+            items_added = 0
+            for item in items_with_ids:
+                ingredient_id = item.get('ingredient_id')
+                if not ingredient_id:
+                    continue
+
+                self.grocery_repo.add_or_merge_item(
+                    grocery_list_id=grocery_list.id,
+                    ingredient_id=ingredient_id,
+                    quantity=item.get('quantity', 0),
+                    unit=item.get('unit', 'piece')
+                )
+                items_added += 1
+
+            # Get updated list
+            updated_list = self.grocery_repo.get_or_create_default_list()
+            list_dict = updated_list.model_dump() if hasattr(updated_list, 'model_dump') else dict(updated_list)
+
+            return {
+                "status": "success",
+                "message": f"Added {items_added} ingredients from meal plan '{meal_plan.name}' to grocery list",
+                "grocery_list": list_dict,
+            }
+            
+        except Exception as e:
+            logger.error(f"Error adding meal plan ingredients: {e}")
+            return {
+                "status": "error",
+                "message": str(e),
+            }
+    
+    def add_meal_plan_ingredients_async(self, meal_plan_id: int) -> str:
+        """
+        Start async task to add ingredients from a meal plan to the grocery list.
+        
+        Returns immediately with a task ID that can be used to check status.
+        
+        Args:
+            meal_plan_id: ID of the meal plan
+            
+        Returns:
+            Task ID string
+        """
+        task_service = get_task_service()
+        task_id = task_service.create_task(metadata={
+            "operation": "add_meal_plan_ingredients",
+            "meal_plan_id": meal_plan_id
+        })
+        
+        # Start background thread to process
+        thread = threading.Thread(
+            target=self._process_meal_plan_async,
+            args=(task_id, meal_plan_id),
+            daemon=True
+        )
+        thread.start()
+        
+        logger.info(f"Started async task {task_id} for meal plan {meal_plan_id}")
+        return task_id
+    
+    def _process_meal_plan_async(self, task_id: str, meal_plan_id: int) -> None:
+        """
+        Background worker to process meal plan ingredients.
+        
+        Args:
+            task_id: Task ID to update with status
+            meal_plan_id: Meal plan to process
+        """
+        task_service = get_task_service()
+        
+        try:
+            # Mark as processing
+            task_service.mark_processing(task_id)
+            
+            # Execute the actual work (this calls the LLM)
+            result = self.add_meal_plan_ingredients(meal_plan_id)
+            
+            if result.get("status") == "success":
+                task_service.mark_completed(task_id, result)
+            else:
+                task_service.mark_failed(task_id, result.get("message", "Unknown error"))
+                
+        except Exception as e:
+            logger.error(f"Error in async task {task_id}: {e}", exc_info=True)
+            task_service.mark_failed(task_id, str(e))
+    
+    def clear_checked_items(self, grocery_list_id: int) -> Dict[str, Any]:
+        """
+        Remove all checked/purchased items from a grocery list.
+        
+        Args:
+            grocery_list_id: ID of the grocery list
+            
+        Returns:
+            Dictionary with result
+        """
+        try:
+            # Verify list exists
+            grocery_list = self.grocery_repo.get_by_id(grocery_list_id)
+            if grocery_list is None:
+                return {
+                    "status": "error",
+                    "message": f"Grocery list with ID {grocery_list_id} not found",
+                }
+            
+            deleted_count = self.grocery_repo.delete_checked_items(grocery_list_id)
+            
+            return {
+                "status": "success",
+                "message": f"Removed {deleted_count} checked items",
+                "deleted_count": deleted_count,
+            }
+            
+        except Exception as e:
+            logger.error(f"Error clearing checked items: {e}")
+            return {
+                "status": "error",
+                "message": str(e),
+            }
+    
+    def clear_all_items(self, grocery_list_id: int) -> Dict[str, Any]:
+        """
+        Remove all items from a grocery list.
+        
+        Args:
+            grocery_list_id: ID of the grocery list
+            
+        Returns:
+            Dictionary with result
+        """
+        try:
+            # Verify list exists
+            grocery_list = self.grocery_repo.get_by_id(grocery_list_id)
+            if grocery_list is None:
+                return {
+                    "status": "error",
+                    "message": f"Grocery list with ID {grocery_list_id} not found",
+                }
+            
+            deleted_count = self.grocery_repo.delete_all_items(grocery_list_id)
+            
+            return {
+                "status": "success",
+                "message": f"Removed all {deleted_count} items from list",
+                "deleted_count": deleted_count,
+            }
+            
+        except Exception as e:
+            logger.error(f"Error clearing all items: {e}")
             return {
                 "status": "error",
                 "message": str(e),

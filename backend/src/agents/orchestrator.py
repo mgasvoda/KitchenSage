@@ -6,6 +6,7 @@ import os
 from crewai import Agent
 from typing import List, Optional, Dict, Any
 from src.tools.web_tools import WebSearchTool
+from src.config import settings, is_reasoning_model
 
 
 class OrchestratorAgent:
@@ -34,7 +35,14 @@ class OrchestratorAgent:
             llm_config = {}
         else:
             from langchain_openai import ChatOpenAI
-            llm_config = {"llm": ChatOpenAI(model="gpt-4.1-mini", temperature=0.1)}
+            model = settings.llm.orchestrator_model
+            llm_params = {"model": model}
+            # Reasoning models don't support temperature or stop parameters
+            if is_reasoning_model(model):
+                llm_params["disabled_params"] = {"stop": None}
+            else:
+                llm_params["temperature"] = settings.llm.orchestrator_temperature
+            llm_config = {"llm": ChatOpenAI(**llm_params)}
         
         self.agent = Agent(
             role="KitchenCrew Query Orchestrator",
@@ -56,7 +64,7 @@ class OrchestratorAgent:
             cooking agents, ensuring every request is properly understood and routed to 
             the right experts.""",
             tools=self.tools,
-            verbose=True,
+            verbose=settings.llm.agent_verbose,
             allow_delegation=True,  # This agent can delegate to other agents
             **llm_config
         ) 

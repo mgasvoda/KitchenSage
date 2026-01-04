@@ -6,6 +6,7 @@ import os
 from crewai import Agent
 from src.tools.meal_planning_tools import MealPlanningTool, NutritionAnalysisTool, CalendarTool
 from src.tools.database_tools import RecipeSearchTool
+from src.config import settings, is_reasoning_model
 
 
 class MealPlannerAgent:
@@ -35,7 +36,14 @@ class MealPlannerAgent:
             llm_config = {}
         else:
             from langchain_openai import ChatOpenAI
-            llm_config = {"llm": ChatOpenAI(model="gpt-4.1-mini", temperature=0.3)}
+            model = settings.llm.meal_planner_model
+            llm_params = {"model": model}
+            # Reasoning models don't support temperature or stop parameters
+            if is_reasoning_model(model):
+                llm_params["disabled_params"] = {"stop": None}
+            else:
+                llm_params["temperature"] = settings.llm.meal_planner_temperature
+            llm_config = {"llm": ChatOpenAI(**llm_params)}
         
         self.agent = Agent(
             role="Certified Nutritionist and Meal Planning Expert",
@@ -44,10 +52,15 @@ class MealPlannerAgent:
             extensive knowledge of dietary requirements, nutritional balance, and meal 
             optimization. You understand how to create varied, healthy, and appealing 
             meal plans that meet specific dietary restrictions, budget constraints, and 
-            time limitations. Your expertise includes macro and micronutrient balance, 
-            portion control, and seasonal ingredient planning.""",
+            time limitations.
+            
+            By default, assume the user is primarily planning dinners. Only include
+            breakfast, lunch, and/or snacks when the user explicitly requests them.
+            
+            Your expertise includes macro and micronutrient balance, portion control,
+            and seasonal ingredient planning.""",
             tools=self.tools,
-            verbose=True,
+            verbose=settings.llm.agent_verbose,
             allow_delegation=False,
             **llm_config
         ) 

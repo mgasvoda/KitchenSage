@@ -17,9 +17,9 @@ interface AgentActivityPanelProps {
   onComplete: (mealPlan: string) => void;
   eventStream: AsyncGenerator<AgentActivityEvent> | null;
   planConfig: {
-    days: number;
     people: number;
-    dietary_restrictions: string[];
+    days?: number;
+    prompt?: string;
     budget?: number;
   };
 }
@@ -60,6 +60,7 @@ export function AgentActivityPanel({
     if (!eventStream || !isOpen) return;
 
     let isCancelled = false;
+    let lastKnownDays = planConfig.days ?? 0;
 
     const processStream = async () => {
       try {
@@ -128,6 +129,7 @@ export function AgentActivityPanel({
             case 'preview_update':
               if (event.preview?.days) {
                 setPreview(event.preview.days);
+                lastKnownDays = event.preview.days.length;
               }
               break;
 
@@ -143,13 +145,17 @@ export function AgentActivityPanel({
               if (event.meal_plan) {
                 setMealPlanResult(event.meal_plan);
                 // Mark all preview days as complete
-                const completedDays = Array.from({ length: planConfig.days }, (_, i) => {
+                const finalDays = Math.max(
+                  planConfig.days ?? 0,
+                  lastKnownDays,
+                  preview.length,
+                  7
+                );
+                const completedDays = Array.from({ length: finalDays }, (_, i) => {
                   const date = new Date();
                   date.setDate(date.getDate() + i);
                   return {
                     date: date.toISOString().split('T')[0],
-                    breakfast: 'Planned',
-                    lunch: 'Planned',
                     dinner: 'Planned',
                   };
                 });
@@ -264,14 +270,14 @@ export function AgentActivityPanel({
   const getPreviewDays = () => {
     const days: MealPlanDayPreview[] = [];
     const today = new Date();
-    for (let i = 0; i < Math.min(planConfig.days, 7); i++) {
+    const requestedDays =
+      planConfig.days ?? (preview.length > 0 ? preview.length : 7);
+    for (let i = 0; i < Math.min(requestedDays, 7); i++) {
       const date = new Date(today);
       date.setDate(today.getDate() + i);
       const existing = preview.find(p => p.date === date.toISOString().split('T')[0]);
       days.push({
         date: date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
-        breakfast: existing?.breakfast || 'pending',
-        lunch: existing?.lunch || 'pending',
         dinner: existing?.dinner || 'pending',
       });
     }
@@ -305,8 +311,8 @@ export function AgentActivityPanel({
                 {isComplete ? 'Meal Plan Ready!' : 'Creating Your Meal Plan'}
               </h2>
               <p className="text-sage-100 text-sm">
-                {planConfig.days} days • {planConfig.people} people
-                {planConfig.dietary_restrictions.length > 0 && ` • ${planConfig.dietary_restrictions.join(', ')}`}
+                {(planConfig.days ?? (preview.length > 0 ? preview.length : 7))} days • {planConfig.people} people
+                {planConfig.prompt && planConfig.prompt.trim() && ` • ${planConfig.prompt.length > 50 ? planConfig.prompt.slice(0, 50) + '...' : planConfig.prompt}`}
               </p>
             </div>
           </div>
@@ -425,12 +431,10 @@ export function AgentActivityPanel({
                 >
                   <div className="px-3 font-medium text-sage-800">{day.date}</div>
                   <div className="px-3 text-sage-600 truncate">
-                    {day.breakfast !== 'pending' && day.lunch !== 'pending' && day.dinner !== 'pending' 
-                      ? `${day.breakfast?.split(' ').slice(0, 2).join(' ')}...` 
-                      : '—'}
+                    {day.dinner !== 'pending' ? `${day.dinner?.split(' ').slice(0, 4).join(' ') || 'Dinner'}...` : '—'}
                   </div>
                   <div className="px-3">
-                    {day.breakfast !== 'pending' && day.lunch !== 'pending' && day.dinner !== 'pending' ? (
+                    {day.dinner !== 'pending' ? (
                       <span className="inline-flex items-center gap-1 text-green-600">
                         <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />

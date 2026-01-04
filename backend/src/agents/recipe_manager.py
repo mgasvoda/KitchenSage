@@ -5,6 +5,7 @@ Recipe Manager Agent - Handles database operations and recipe management.
 import os
 from crewai import Agent
 from typing import List, Optional
+from src.config import settings, is_reasoning_model
 
 
 class RecipeManagerAgent:
@@ -30,7 +31,14 @@ class RecipeManagerAgent:
             llm_config = {}
         else:
             from langchain_openai import ChatOpenAI
-            llm_config = {"llm": ChatOpenAI(model="gpt-4.1-mini", temperature=0.1)}
+            model = settings.llm.recipe_manager_model
+            llm_params = {"model": model}
+            # Reasoning models don't support temperature or stop parameters
+            if is_reasoning_model(model):
+                llm_params["disabled_params"] = {"stop": None}
+            else:
+                llm_params["temperature"] = settings.llm.recipe_manager_temperature
+            llm_config = {"llm": ChatOpenAI(**llm_params)}
         
         self.agent = Agent(
             role="Recipe Database Manager",
@@ -38,10 +46,10 @@ class RecipeManagerAgent:
             backstory="""You are an expert data manager with deep knowledge of recipe 
             structures and database operations. You ensure that all recipe data is 
             properly validated, stored, and easily retrievable. You have years of 
-            experience in culinary data management and understand the nuances of 
+            experience in culinary data management and understand the nuances of
             recipe formatting, ingredient standardization, and nutritional data.""",
             tools=self.tools,
-            verbose=True,
+            verbose=settings.llm.agent_verbose,
             allow_delegation=False,
             **llm_config
         ) 

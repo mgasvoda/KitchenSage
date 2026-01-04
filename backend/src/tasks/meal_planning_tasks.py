@@ -12,7 +12,7 @@ class MealPlanningTasks:
     def create_meal_plan_task(self,
                              days: int = 7,
                              people: int = 2,
-                             dietary_restrictions: Optional[List[str]] = None,
+                             prompt: Optional[str] = None,
                              budget: Optional[float] = None) -> Task:
         """
         Task to create a comprehensive meal plan.
@@ -20,33 +20,38 @@ class MealPlanningTasks:
         Args:
             days: Number of days for the meal plan
             people: Number of people the plan should serve
-            dietary_restrictions: List of dietary restrictions
+            prompt: Free-form preferences and instructions
             budget: Optional budget constraint
             
         Returns:
             CrewAI Task object
         """
-        restrictions_text = ", ".join(dietary_restrictions) if dietary_restrictions else "None"
         budget_text = f"${budget:.2f}" if budget else "No budget limit"
+        preferences_text = prompt if prompt else "No specific preferences provided"
         
         return Task(
             description=f"""
-            Create a {days}-day meal plan for {people} people with the following requirements:
-            - Dietary restrictions: {restrictions_text}
-            - Budget constraint: {budget_text}
+            Create a {days}-day meal plan for {people} people.
+            
+            Budget constraint: {budget_text}
+            
+            User preferences and instructions:
+            {preferences_text}
             
             The meal plan should include:
-            1. Breakfast, lunch, and dinner for each day
-            2. Nutritionally balanced meals across the period
-            3. Variety in cuisines and ingredients
-            4. Consideration of preparation time and complexity
-            5. Seasonal ingredient preferences
-            6. Cost optimization within budget constraints
+            1. By default, plan dinners only for each day
+            2. Include breakfast, lunch, and/or snacks ONLY if the user explicitly asks for them
+            3. Nutritionally balanced meals across the period (for the meals requested)
+            4. Variety in cuisines and ingredients
+            5. Consideration of preparation time and complexity
+            6. Seasonal ingredient preferences
+            7. Cost optimization within budget constraints
             
+            Pay close attention to the user's preferences and instructions above.
             Ensure meals complement each other and ingredients can be efficiently used
             across multiple recipes to minimize waste.
             """,
-            expected_output="Complete meal plan with recipes assigned to each meal, nutritional summary, and cost estimate",
+            expected_output="Complete meal plan with recipes assigned to each planned meal (dinners by default), nutritional summary, and cost estimate",
             async_execution=False,
             context=[]
         )

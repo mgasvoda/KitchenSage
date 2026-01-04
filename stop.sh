@@ -25,22 +25,13 @@ print_message() {
     echo -e "${color}${message}${NC}"
 }
 
-# Stop a service
-stop_service() {
-    local service=$1
-    local pid_file=$2
-
-    if [ ! -f "$pid_file" ]; then
-        print_message "$YELLOW" "⚠️  $service is not running (no PID file)"
-        return 0
-    fi
-
-    local pid=$(cat "$pid_file")
+# Kill process by PID
+kill_pid() {
+    local pid=$1
+    local service=$2
 
     if ! ps -p "$pid" > /dev/null 2>&1; then
-        print_message "$YELLOW" "⚠️  $service is not running (stale PID: $pid)"
-        rm -f "$pid_file"
-        return 0
+        return 1
     fi
 
     print_message "$BLUE" "🛑 Stopping $service (PID: $pid)..."
@@ -68,7 +59,72 @@ stop_service() {
         return 1
     else
         print_message "$GREEN" "✅ $service stopped successfully"
-        rm -f "$pid_file"
+        return 0
+    fi
+}
+
+# Stop processes on a specific port
+stop_by_port() {
+    local port=$1
+    local service=$2
+    local stopped=false
+
+    # Find all PIDs listening on this port
+    local pids=$(lsof -ti :$port 2>/dev/null)
+
+    if [ -z "$pids" ]; then
+        return 0
+    fi
+
+    for pid in $pids; do
+        if kill_pid "$pid" "$service on port $port"; then
+            stopped=true
+        fi
+    done
+
+    if [ "$stopped" = true ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+# Stop a service
+stop_service() {
+    local service=$1
+    local pid_file=$2
+    local port=$3
+
+    local stopped=false
+
+    # Try to stop using PID file first
+    if [ -f "$pid_file" ]; then
+        local pid=$(cat "$pid_file")
+
+        if ps -p "$pid" > /dev/null 2>&1; then
+            if kill_pid "$pid" "$service"; then
+                stopped=true
+                rm -f "$pid_file"
+            fi
+        else
+            print_message "$YELLOW" "⚠️  $service PID file is stale (PID: $pid)"
+            rm -f "$pid_file"
+        fi
+    else
+        print_message "$YELLOW" "⚠️  No PID file for $service"
+    fi
+
+    # Also check for orphaned processes on the port
+    if [ -n "$port" ]; then
+        if stop_by_port "$port" "$service"; then
+            stopped=true
+        fi
+    fi
+
+    if [ "$stopped" = true ]; then
+        return 0
+    else
+        print_message "$YELLOW" "⚠️  $service was not running"
         return 0
     fi
 }
@@ -80,8 +136,16 @@ main() {
     print_message "$GREEN" "======================================"
     echo ""
 
-    stop_service "Backend" "$BACKEND_PID"
-    stop_service "Frontend" "$FRONTEND_PID"
+    stop_service "Backend" "$BACKEND_PID" "8000"
+    stop_service "Frontend" "$FRONTEND_PID" "5173"
+
+    # Also check for any orphaned Vite servers on alternate ports
+    for port in 5174 5175 5176 5177 5178 5179; do
+        if lsof -ti :$port > /dev/null 2>&1; then
+            print_message "$YELLOW" "⚠️  Found orphaned process on port $port"
+            stop_by_port "$port" "Orphaned Vite server"
+        fi
+    done
 
     echo ""
     print_message "$GREEN" "✅ All services stopped"

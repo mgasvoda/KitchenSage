@@ -81,8 +81,7 @@ def create_database():
         CREATE TABLE IF NOT EXISTS meal_plans (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
-            start_date DATE,
-            end_date DATE,
+            is_active BOOLEAN DEFAULT FALSE,
             people_count INTEGER,
             dietary_restrictions TEXT,
             description TEXT,
@@ -100,7 +99,7 @@ def create_database():
             meal_plan_id INTEGER,
             recipe_id INTEGER,
             meal_type TEXT,
-            meal_date DATE,
+            day_number INTEGER,
             servings_override INTEGER,
             notes TEXT,
             FOREIGN KEY (meal_plan_id) REFERENCES meal_plans (id),
@@ -113,9 +112,15 @@ def create_database():
         CREATE TABLE IF NOT EXISTS grocery_lists (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             meal_plan_id INTEGER,
-            estimated_cost REAL,
+            name TEXT,
+            estimated_total REAL,
+            actual_total REAL,
+            budget_limit REAL,
+            store_preferences TEXT,
             completed BOOLEAN DEFAULT FALSE,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            completed_at TIMESTAMP,
             FOREIGN KEY (meal_plan_id) REFERENCES meal_plans (id)
         )
     ''')
@@ -129,6 +134,12 @@ def create_database():
             quantity REAL,
             unit TEXT,
             estimated_price REAL,
+            actual_price REAL,
+            status TEXT DEFAULT 'needed',
+            store_section TEXT,
+            preferred_brand TEXT,
+            substitutes TEXT,
+            notes TEXT,
             purchased BOOLEAN DEFAULT FALSE,
             FOREIGN KEY (grocery_list_id) REFERENCES grocery_lists (id),
             FOREIGN KEY (ingredient_id) REFERENCES ingredients (id)
