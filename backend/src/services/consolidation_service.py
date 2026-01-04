@@ -1,8 +1,9 @@
 """
-Token-optimized LLM-powered grocery list consolidation service.
+Enhanced LLM-powered grocery list consolidation service.
 
-Uses ultra-compact format and intelligent pre-processing to minimize token usage
-while maintaining high-quality semantic consolidation.
+Uses semantic understanding with few-shot examples to intelligently consolidate
+grocery items, handling container sizes, cross-metric conversions, and ingredient
+derivatives.
 """
 
 import os
@@ -13,23 +14,68 @@ from collections import defaultdict
 
 from openai import OpenAI
 from src.config import settings, is_reasoning_model
+from src.utils.ingredient_preprocessor import preprocess_ingredients
 
 logger = logging.getLogger(__name__)
 
-# Ultra-minimal system prompt
-CONSOLIDATION_SYSTEM_PROMPT = """Merge similar groceries, sum quantities, remove water/ice. Output JSON array: [["name",qty,"unit"], ...]"""
+# Enhanced system prompt with rules and few-shot examples
+CONSOLIDATION_SYSTEM_PROMPT = """You are a grocery list consolidation expert. Merge similar ingredients intelligently.
+
+RULES:
+1. Merge items that are the same ingredient (ignore preparation states like "diced", "minced", "chopped", "sliced")
+2. Sum quantities when units match
+3. Convert between compatible units when possible (1 lb = 16 oz, 3 tsp = 1 tbsp, 1 cup = 8 fl oz)
+4. For derivatives (zest, juice), INCREASE the base ingredient count to cover the derivative need
+5. Remove water and ice (these are not purchased items)
+6. Standardize names (remove brand names, container descriptions)
+7. When units are incompatible (pieces vs cups), CONVERT to pieces using these estimates:
+   - 1 medium onion ~ 1 cup diced
+   - 1 garlic clove ~ 0.5 tbsp minced
+   - 1 bell pepper ~ 1 cup diced
+   - 1 medium carrot ~ 0.5 cup sliced
+8. For citrus derivatives:
+   - 1 lemon ~ 3 tbsp juice, 1 tbsp zest
+   - 1 lime ~ 2 tbsp juice, 1 tsp zest
+   - 1 orange ~ 1/4 cup juice, 1 tbsp zest
+
+EXAMPLES:
+
+Input: [["crushed tomatoes (28 oz can)", 1, "can"], ["crushed tomatoes (14.5 oz can)", 2, "can"]]
+Output: {"items": [["crushed tomatoes", 57, "oz"]]}
+
+Input: [["onion", 2, "piece"], ["onion, diced", 0.5, "cup"]]
+Output: {"items": [["onion", 2.5, "piece"]]}
+
+Input: [["lemon", 2, "piece"], ["lemon zest", 2, "tbsp"]]
+Output: {"items": [["lemon", 4, "piece"]]}
+
+Input: [["blue cheese", 4, "oz"], ["crumbled blue cheese", 2, "oz"]]
+Output: {"items": [["blue cheese", 6, "oz"]]}
+
+Input: [["garlic", 4, "clove"], ["garlic, minced", 2, "tbsp"]]
+Output: {"items": [["garlic", 8, "clove"]]}
+
+Input: [["water", 2, "cup"], ["ice", 1, "cup"], ["chicken breast", 1, "lb"]]
+Output: {"items": [["chicken breast", 1, "lb"]]}
+
+INPUT FORMAT: [["name", qty, "unit"], ...]
+OUTPUT FORMAT: {"items": [["name", qty, "unit"], ...]}
+
+Now consolidate the following grocery list:"""
 
 
 class GroceryConsolidationService:
     """
-    Service for consolidating grocery list items using LLM with optimized token usage.
+    Service for consolidating grocery list items using enhanced LLM processing.
 
-    Key optimizations:
-    - Ultra-compact array format instead of objects
+    Features:
+    - Semantic understanding of ingredient derivatives (zest, juice, crumbled)
+    - Cross-metric unit conversion (pieces vs cups)
+    - Container size extraction and conversion
+    - Pre-processing for normalization before LLM
+    - Few-shot examples for consistent consolidation
     - Pre-grouping for exact matches
     - Batch processing for large lists
-    - Minimal system prompt
-    - No ingredient_id in LLM (reconnected after)
     """
 
     def __init__(self):
@@ -214,12 +260,13 @@ class GroceryConsolidationService:
         raw_items: List[Dict[str, Any]]
     ) -> List[Dict[str, Any]]:
         """
-        Consolidate a list of raw grocery items using optimized LLM processing.
+        Consolidate a list of raw grocery items using enhanced LLM processing.
 
         This is the main entry point. Handles:
+        - Pre-processing for normalization (container sizes, units)
         - Pre-grouping for exact matches (if list is large enough)
         - Batch processing for very large lists
-        - Ultra-compact format for token efficiency
+        - Semantic consolidation via LLM with few-shot examples
 
         NOTE: ingredient_id is NOT preserved during consolidation.
         Caller must reconnect IDs after using ingredient name lookup.
@@ -249,23 +296,26 @@ class GroceryConsolidationService:
             ]
 
         try:
-            logger.info(f"Starting LLM consolidation for {len(raw_items)} items")
+            logger.info(f"Starting enhanced consolidation for {len(raw_items)} items")
 
-            # Pre-group exact matches if list is large enough
-            if len(raw_items) >= settings.llm.consolidation_pregroup_threshold:
-                items_to_consolidate, _ = self._pregroup_exact_matches(raw_items)
+            # Step 1: Pre-process items (normalize units, extract container sizes)
+            preprocessed_items = preprocess_ingredients([
+                {
+                    'name': item.get('name', ''),
+                    'quantity': item.get('quantity', 0),
+                    'unit': item.get('unit', 'piece')
+                }
+                for item in raw_items
+            ])
+            logger.debug(f"Pre-processed {len(raw_items)} items")
+
+            # Step 2: Pre-group exact matches if list is large enough
+            if len(preprocessed_items) >= settings.llm.consolidation_pregroup_threshold:
+                items_to_consolidate, _ = self._pregroup_exact_matches(preprocessed_items)
             else:
-                # Just strip ingredient_id
-                items_to_consolidate = [
-                    {
-                        'name': item.get('name', ''),
-                        'quantity': item.get('quantity', 0),
-                        'unit': item.get('unit', 'piece')
-                    }
-                    for item in raw_items
-                ]
+                items_to_consolidate = preprocessed_items
 
-            # Batch processing for very large lists
+            # Step 3: Batch processing for very large lists
             batch_size = settings.llm.consolidation_batch_size
 
             if len(items_to_consolidate) <= batch_size:

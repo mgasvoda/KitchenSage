@@ -48,8 +48,8 @@ class LLMSettings(BaseSettings):
     )
 
     consolidation_model: str = Field(
-        default="gpt-5-nano",
-        description="LLM model for grocery list consolidation"
+        default="gpt-5-mini",
+        description="LLM model for grocery list consolidation (reasoning model for better semantic understanding)"
     )
 
     # Agent-specific models
