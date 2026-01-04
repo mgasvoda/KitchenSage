@@ -1,0 +1,219 @@
+---
+description: Frontend rules for React/TypeScript development with testing requirements
+globs: frontend/**/*
+alwaysApply: false
+---
+# Frontend Cursor Rules for KitchenSage
+
+## ⚠️ MANDATORY TESTING REQUIREMENTS ⚠️
+
+**ALL frontend changes MUST include corresponding test updates.**
+
+### Unit Tests (Vitest + React Testing Library)
+
+1. **Every component change requires test updates:**
+   - New components → Create `.test.tsx` file in same directory
+   - Modified components → Update existing tests or add new cases
+   - New hooks → Create `useHookName.test.ts` file
+   - Utility functions → Create corresponding test file
+
+2. **Test structure:**
+```typescript
+import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
+import { MyComponent } from './MyComponent';
+
+describe('MyComponent', () => {
+  it('renders correctly with default props', () => {
+    render(<MyComponent />);
+    expect(screen.getByRole('button')).toBeInTheDocument();
+  });
+
+  it('handles user interaction', async () => {
+    const onSubmit = vi.fn();
+    render(<MyComponent onSubmit={onSubmit} />);
+    fireEvent.click(screen.getByRole('button'));
+    expect(onSubmit).toHaveBeenCalled();
+  });
+});
+```
+
+3. **What to test:**
+   - Component renders without errors
+   - User interactions trigger expected behavior
+   - Props affect rendering correctly
+   - Error states display appropriately
+   - Loading states work correctly
+
+### E2E Tests (Playwright) - REQUIRED FOR SIGNIFICANT CHANGES
+
+1. **When E2E tests are MANDATORY:**
+   - Adding new pages or routes
+   - New user flows or workflows
+   - Form submissions and validations
+   - Navigation changes
+   - Modal dialogs and interactive overlays
+   - API integration changes visible to users
+   - Authentication/authorization flows
+
+2. **E2E test location:** `frontend/e2e/`
+
+3. **E2E test structure:**
+```typescript
+import { test, expect } from '@playwright/test';
+
+test.describe('Feature Name', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/relevant-page');
+  });
+
+  test('should complete user flow successfully', async ({ page }) => {
+    // Arrange - set up the page state
+    await page.fill('[data-testid="input"]', 'test value');
+    
+    // Act - perform user action
+    await page.click('[data-testid="submit-button"]');
+    
+    // Assert - verify expected outcome
+    await expect(page.locator('[data-testid="success-message"]')).toBeVisible();
+  });
+
+  test('should handle error states', async ({ page }) => {
+    // Test error scenarios
+  });
+});
+```
+
+4. **E2E best practices:**
+   - Use `data-testid` attributes for reliable selectors
+   - Test complete user journeys, not isolated clicks
+   - Include both happy path and error scenarios
+   - Wait for network requests to complete when testing API interactions
+
+### Running Tests
+
+```bash
+# Unit tests
+npm test                    # Run all unit tests
+npm test -- --watch         # Watch mode
+npm test -- MyComponent     # Run specific test file
+
+# E2E tests
+npm run test:e2e            # Run all Playwright tests
+npx playwright test         # Alternative command
+npx playwright test --ui    # Interactive UI mode
+npx playwright test e2e/specific.spec.ts  # Run specific spec
+```
+
+### Pre-Commit Checklist
+
+Before completing any frontend task:
+- [ ] New/modified components have unit test coverage
+- [ ] Significant UI changes have E2E test coverage
+- [ ] All unit tests pass: `npm test`
+- [ ] All E2E tests pass: `npm run test:e2e`
+
+---
+
+## Tech Stack
+- React 18+ with TypeScript
+- Vite as build tool
+- Tailwind CSS for styling
+- React Router for navigation
+
+## Component Conventions
+
+### File Structure
+- Components in `src/components/` organized by feature
+- Pages in `src/pages/`
+- Types in `src/types/`
+- API client in `src/services/api.ts`
+
+### Component Patterns
+```typescript
+// Prefer function components with explicit exports
+export function MyComponent() {
+  // hooks at top
+  const [state, setState] = useState();
+  
+  // handlers
+  const handleClick = () => {};
+  
+  // render
+  return <div>...</div>;
+}
+```
+
+### Naming
+- Components: PascalCase (e.g., `RecipeCard.tsx`)
+- Hooks: camelCase with `use` prefix (e.g., `useRecipes.ts`)
+- Types: PascalCase (e.g., `Recipe`, `MealPlan`)
+- CSS classes: kebab-case via Tailwind
+
+## Styling Guidelines
+
+### Theme Colors (Custom)
+- `sage-*`: Primary green palette (100-900)
+- `terracotta-*`: Accent orange palette (100-900)
+- `cream-*`: Background neutral palette (50-500)
+
+### Usage
+```tsx
+// Prefer semantic color usage
+<div className="bg-sage-600 text-cream-100">  // Primary action
+<div className="bg-terracotta-500 text-white">  // Accent/CTA
+<div className="bg-cream-50 text-sage-800">  // Background
+```
+
+### Animation
+- Use built-in `animate-fade-in`, `animate-slide-up`
+- Stagger with `stagger-1` through `stagger-5`
+- Prefer CSS transitions over JS animations
+
+## API Integration
+
+### Using the API Client
+```typescript
+import { recipeApi, chatApi } from '../services/api';
+
+// Typed responses
+const { recipes } = await recipeApi.list({ search: 'pasta' });
+
+// Streaming chat
+for await (const event of chatApi.streamMessage(message)) {
+  if (event.type === 'token') {
+    // handle streaming token
+  }
+}
+```
+
+### Error Handling
+```typescript
+try {
+  const data = await recipeApi.get(id);
+} catch (error) {
+  setError(error instanceof Error ? error.message : 'Failed');
+}
+```
+
+## Performance
+
+### Best Practices
+- Use `useState` lazy initialization for expensive computations
+- Memoize callbacks with `useCallback` when passed to children
+- Use `useMemo` for expensive derived state
+- Avoid inline object/array creation in JSX
+
+### Loading States
+```tsx
+{loading && <LoadingSpinner />}
+{error && <ErrorMessage message={error} />}
+{!loading && data && <Content data={data} />}
+```
+
+## Accessibility
+
+- Include ARIA labels for interactive elements
+- Use semantic HTML (button, nav, main, etc.)
+- Ensure color contrast meets WCAG AA
+- Support keyboard navigation
