@@ -7,7 +7,7 @@ test.describe('Recipe Search', () => {
 
   test('should display recipes page with search bar', async ({ page }) => {
     // Verify page loaded
-    await expect(page.locator('h1')).toContainText('Recipes');
+    await expect(page.getByRole('heading', { name: 'Recipes' })).toBeVisible();
     
     // Verify search input exists
     const searchInput = page.locator('input[placeholder*="Search recipes"]');
@@ -23,9 +23,9 @@ test.describe('Recipe Search', () => {
     await filtersButton.click();
     
     // Verify filter panel appears with meal type options
-    await expect(page.locator('text=Meal Type')).toBeVisible();
-    await expect(page.locator('text=Cuisine')).toBeVisible();
-    await expect(page.locator('text=Difficulty')).toBeVisible();
+    await expect(page.locator('label:has-text("Meal Type")')).toBeVisible();
+    await expect(page.locator('label:has-text("Cuisine")')).toBeVisible();
+    await expect(page.locator('label:has-text("Difficulty")')).toBeVisible();
     
     // Click again to hide
     await filtersButton.click();
@@ -159,8 +159,11 @@ test.describe('Recipe Search', () => {
   });
 
   test('should display meal types on recipe cards in modal', async ({ page }) => {
-    // Wait for recipes to load
-    await page.waitForLoadState('networkidle');
+    // Wait for page to stabilize by looking for the header
+    await expect(page.getByRole('heading', { name: 'Recipes' })).toBeVisible();
+    
+    // Wait a moment for recipes to load
+    await page.waitForTimeout(1000);
     
     // Check if there are any recipe cards
     const recipeCards = page.locator('.grid > div');
@@ -171,12 +174,7 @@ test.describe('Recipe Search', () => {
       await recipeCards.first().click();
       
       // Modal should be visible
-      await expect(page.locator('.fixed.inset-0')).toBeVisible();
-      
-      // Meal types should be displayed (if recipe has them)
-      // This is optional since not all recipes may have meal types
-      const mealTypeBadges = page.locator('.bg-blue-100.text-blue-700');
-      // Just verify the modal is working, meal types are optional
+      await expect(page.locator('.fixed.inset-0')).toBeVisible({ timeout: 5000 });
     }
   });
 
