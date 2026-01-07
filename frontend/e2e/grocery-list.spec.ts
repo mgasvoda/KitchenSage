@@ -52,10 +52,10 @@ test.describe('Grocery List', () => {
               id: 1,
               meal_plan_id: null,
               items: [
-                { id: 1, ingredient_id: 1, ingredient_name: 'Tomatoes', quantity: 4, unit: 'piece', category: 'Produce', checked: false },
-                { id: 2, ingredient_id: 2, ingredient_name: 'Onions', quantity: 2, unit: 'piece', category: 'Produce', checked: false },
-                { id: 3, ingredient_id: 3, ingredient_name: 'Chicken Breast', quantity: 500, unit: 'g', category: 'Meat', checked: true },
-                { id: 4, ingredient_id: 4, ingredient_name: 'Milk', quantity: 1, unit: 'liter', category: 'Dairy', checked: false }
+                { id: 1, ingredient_id: 1, ingredient: { name: 'Tomatoes', category: 'Produce' }, quantity: 4, unit: 'piece', status: 'needed', purchased: false, substitutes: [] },
+                { id: 2, ingredient_id: 2, ingredient: { name: 'Onions', category: 'Produce' }, quantity: 2, unit: 'piece', status: 'needed', purchased: false, substitutes: [] },
+                { id: 3, ingredient_id: 3, ingredient: { name: 'Chicken Breast', category: 'Meat' }, quantity: 500, unit: 'g', status: 'purchased', purchased: true, substitutes: [] },
+                { id: 4, ingredient_id: 4, ingredient: { name: 'Milk', category: 'Dairy' }, quantity: 1, unit: 'liter', status: 'needed', purchased: false, substitutes: [] }
               ],
               completed: false
             }
@@ -97,7 +97,7 @@ test.describe('Grocery List', () => {
               id: 1,
               meal_plan_id: null,
               items: [
-                { id: 1, ingredient_id: 1, ingredient_name: 'Tomatoes', quantity: 4, unit: 'piece', category: 'Produce', checked: false }
+                { id: 1, ingredient_id: 1, ingredient: { name: 'Tomatoes', category: 'Produce' }, quantity: 4, unit: 'piece', status: 'needed', purchased: false, substitutes: [] }
               ],
               completed: false
             }
@@ -117,7 +117,7 @@ test.describe('Grocery List', () => {
 
   test.describe('Item Toggle', () => {
     test('toggles item checked state', async ({ page }) => {
-      let itemChecked = false;
+      let itemPurchased = false;
 
       await page.route('**/api/grocery-lists/default', async route => {
         await route.fulfill({
@@ -129,7 +129,7 @@ test.describe('Grocery List', () => {
               id: 1,
               meal_plan_id: null,
               items: [
-                { id: 1, ingredient_id: 1, ingredient_name: 'Tomatoes', quantity: 4, unit: 'piece', category: 'Produce', checked: itemChecked }
+                { id: 1, ingredient_id: 1, ingredient: { name: 'Tomatoes', category: 'Produce' }, quantity: 4, unit: 'piece', status: itemPurchased ? 'purchased' : 'needed', purchased: itemPurchased, substitutes: [] }
               ],
               completed: false
             }
@@ -140,14 +140,15 @@ test.describe('Grocery List', () => {
       await page.route('**/api/grocery-lists/1/items/1*', async route => {
         if (route.request().method() === 'PUT') {
           const url = new URL(route.request().url());
-          itemChecked = url.searchParams.get('checked') === 'true';
+          itemPurchased = url.searchParams.get('checked') === 'true';
           await route.fulfill({
             status: 200,
             contentType: 'application/json',
             body: JSON.stringify({
               status: 'success',
               item_id: 1,
-              checked: itemChecked
+              purchased: itemPurchased,
+              status: itemPurchased ? 'purchased' : 'needed'
             })
           });
         }
@@ -186,10 +187,10 @@ test.describe('Grocery List', () => {
               id: 1,
               meal_plan_id: null,
               items: cleared ? [
-                { id: 1, ingredient_id: 1, ingredient_name: 'Tomatoes', quantity: 4, unit: 'piece', category: 'Produce', checked: false }
+                { id: 1, ingredient_id: 1, ingredient: { name: 'Tomatoes', category: 'Produce' }, quantity: 4, unit: 'piece', status: 'needed', purchased: false, substitutes: [] }
               ] : [
-                { id: 1, ingredient_id: 1, ingredient_name: 'Tomatoes', quantity: 4, unit: 'piece', category: 'Produce', checked: false },
-                { id: 2, ingredient_id: 2, ingredient_name: 'Chicken Breast', quantity: 500, unit: 'g', category: 'Meat', checked: true }
+                { id: 1, ingredient_id: 1, ingredient: { name: 'Tomatoes', category: 'Produce' }, quantity: 4, unit: 'piece', status: 'needed', purchased: false, substitutes: [] },
+                { id: 2, ingredient_id: 2, ingredient: { name: 'Chicken Breast', category: 'Meat' }, quantity: 500, unit: 'g', status: 'purchased', purchased: true, substitutes: [] }
               ],
               completed: false
             }
@@ -240,8 +241,8 @@ test.describe('Grocery List', () => {
               id: 1,
               meal_plan_id: null,
               items: cleared ? [] : [
-                { id: 1, ingredient_id: 1, ingredient_name: 'Tomatoes', quantity: 4, unit: 'piece', category: 'Produce', checked: false },
-                { id: 2, ingredient_id: 2, ingredient_name: 'Onions', quantity: 2, unit: 'piece', category: 'Produce', checked: false }
+                { id: 1, ingredient_id: 1, ingredient: { name: 'Tomatoes', category: 'Produce' }, quantity: 4, unit: 'piece', status: 'needed', purchased: false, substitutes: [] },
+                { id: 2, ingredient_id: 2, ingredient: { name: 'Onions', category: 'Produce' }, quantity: 2, unit: 'piece', status: 'needed', purchased: false, substitutes: [] }
               ],
               completed: false
             }
@@ -558,15 +559,20 @@ test.describe('Grocery List', () => {
 
   test.describe('Edge Cases', () => {
     test('handles grocery list with many items', async ({ page }) => {
-      const items = Array.from({ length: 25 }, (_, i) => ({
-        id: i + 1,
-        ingredient_id: i + 1,
-        ingredient_name: `Item ${i + 1}`,
-        quantity: i + 1,
-        unit: 'piece',
-        category: i % 3 === 0 ? 'Produce' : (i % 3 === 1 ? 'Meat' : 'Dairy'),
-        checked: i % 5 === 0
-      }));
+      const items = Array.from({ length: 25 }, (_, i) => {
+        const isPurchased = i % 5 === 0;
+        const category = i % 3 === 0 ? 'Produce' : (i % 3 === 1 ? 'Meat' : 'Dairy');
+        return {
+          id: i + 1,
+          ingredient_id: i + 1,
+          ingredient: { name: `Item ${i + 1}`, category },
+          quantity: i + 1,
+          unit: 'piece',
+          status: isPurchased ? 'purchased' : 'needed',
+          purchased: isPurchased,
+          substitutes: []
+        };
+      });
 
       await page.route('**/api/grocery-lists/default', async route => {
         await route.fulfill({
@@ -609,11 +615,12 @@ test.describe('Grocery List', () => {
                 {
                   id: 1,
                   ingredient_id: 1,
-                  ingredient_name: 'Extra Virgin Cold Pressed Organic Olive Oil from Italy',
+                  ingredient: { name: 'Extra Virgin Cold Pressed Organic Olive Oil from Italy', category: 'Pantry' },
                   quantity: 500,
                   unit: 'ml',
-                  category: 'Pantry',
-                  checked: false
+                  status: 'needed',
+                  purchased: false,
+                  substitutes: []
                 }
               ],
               completed: false
@@ -639,7 +646,7 @@ test.describe('Grocery List', () => {
               id: 1,
               meal_plan_id: null,
               items: [
-                { id: 1, ingredient_id: 1, ingredient_name: 'Mystery Item', quantity: 1, unit: 'piece', category: 'Unknown Category', checked: false }
+                { id: 1, ingredient_id: 1, ingredient: { name: 'Mystery Item', category: 'Unknown Category' }, quantity: 1, unit: 'piece', status: 'needed', purchased: false, substitutes: [] }
               ],
               completed: false
             }
